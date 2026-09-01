@@ -6,3 +6,4 @@ project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 "$project_root/scripts/ci/run_godot_test.sh" godot res://tests/run_m0_tests.gd "$log_root/m0"
 "$project_root/scripts/ci/run_godot_test.sh" godot res://tests/run_m1_combat_tests.gd "$log_root/m1"
+"$project_root/scripts/ci/run_godot_test.sh" godot res://tests/run_m2_ui_tests.gd "$log_root/m2"

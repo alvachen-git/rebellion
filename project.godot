@@ -7,7 +7,7 @@ config_version=5
 
 config/name="架空王朝起义军"
 config/description="长期成长与节点远征结合的架空王朝卡牌策略游戏"
-run/main_scene="res://src/ui/bootstrap/bootstrap.tscn"
+run/main_scene="res://src/ui/combat/combat_screen.tscn"
 
 [display]
 

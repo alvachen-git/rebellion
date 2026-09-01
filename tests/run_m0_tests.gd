@@ -132,7 +132,7 @@ func _test_save_slot_policy() -> void:
 
 func _test_main_scene_exists() -> void:
 	var main_scene: String = ProjectSettings.get_setting("application/run/main_scene", "")
-	_assert_equal(main_scene, "res://src/ui/bootstrap/bootstrap.tscn", "bootstrap is configured as main scene")
+	_assert_equal(main_scene, "res://src/ui/combat/combat_screen.tscn", "combat prototype is configured as main scene")
 	_assert_true(ResourceLoader.exists(main_scene), "configured main scene exists")
 
 
