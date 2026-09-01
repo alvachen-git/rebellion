@@ -169,6 +169,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="EnemyPanel" type="PanelContainer" parent="Page/Battlefield"]
+unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
@@ -199,6 +200,7 @@ theme_override_font_sizes/font_size = 16
 text = "兵力 600/600    士气 60/100    护甲 0\n攻击 20    防御 20"
 
 [node name="PlayerPanel" type="PanelContainer" parent="Page/Battlefield"]
+unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -234,6 +236,27 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.57, 0.72, 0.64, 1)
 theme_override_font_sizes/font_size = 14
 text = "步 35%  ·  弓 15%  ·  骑 50%"
+
+[node name="ImpactLabel" type="Label" parent="Page/Battlefield"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 0.24
+anchor_top = 0.58
+anchor_right = 0.52
+anchor_bottom = 0.58
+offset_top = -18.0
+offset_bottom = 26.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.9, 0.38, 0.31, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.04, 0.03, 0.95)
+theme_override_constants/outline_size = 7
+theme_override_font_sizes/font_size = 28
+text = "兵力 -45"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="Command" type="MarginContainer" parent="Page"]
 custom_minimum_size = Vector2(0, 284)

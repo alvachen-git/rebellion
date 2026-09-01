@@ -76,12 +76,19 @@ func _test_card_hover_affordance() -> void:
 
 
 func _test_end_turn_refreshes_hand_and_intent() -> void:
-	var screen = await _create_screen(_request(_standard_deck(), 1603))
+	var request := _request(_standard_deck(), 1603)
+	request.enemy.skills = [_attack_skill(45)]
+	var screen = await _create_screen(request)
+	var before: Dictionary = screen.combat_snapshot()
 	screen.get_node("%EndTurnButton").pressed.emit()
 	await process_frame
 	var state: Dictionary = screen.combat_snapshot()
 	_assert_true(state.turn == 2, "end-turn button pressed signal reaches combat command")
 	_assert_equal(state.turn, 2, "enemy action resolves before the second player turn")
+	_assert_true(state.player.troops < before.player.troops, "revealed enemy attack reduces player troops")
+	_assert_true("敌军发动【强攻】" in screen.get_node("%FeedbackLabel").text, "enemy attack is named in persistent feedback")
+	_assert_true("兵力 -" in screen.get_node("%ImpactLabel").text, "enemy damage is shown as impact text")
+	_assert_true(screen.get_node("%ImpactLabel").visible, "enemy action displays immediate battlefield feedback")
 	_assert_true(screen.card_button_count() > 0, "new turn renders a refreshed hand")
 	_assert_true(not screen.get_node("%IntentLabel").text.is_empty(), "next enemy intent remains visible")
 	await _destroy_screen(screen)
@@ -181,6 +188,16 @@ func _standard_deck() -> Array:
 		"dev.tactical_cycle",
 		"dev.effect_matrix",
 	]
+
+
+func _attack_skill(base_power: int) -> Dictionary:
+	return {
+		"id": "test.ui_attack",
+		"intent_type": "attack",
+		"weight": 1,
+		"conditions": [],
+		"effects": [{"type": "DealDamage", "base_power": base_power, "target": "opponent"}],
+	}
 
 
 func _assert_true(value: bool, message: String) -> void:

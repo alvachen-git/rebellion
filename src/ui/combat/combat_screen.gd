@@ -27,6 +27,9 @@ var _card_buttons: Array[Button] = []
 @onready var army_label: Label = %ArmyLabel
 @onready var action_label: Label = %ActionLabel
 @onready var feedback_label: Label = %FeedbackLabel
+@onready var enemy_panel: PanelContainer = %EnemyPanel
+@onready var player_panel: PanelContainer = %PlayerPanel
+@onready var impact_label: Label = %ImpactLabel
 @onready var hand_container: HBoxContainer = %HandContainer
 @onready var end_turn_button: Button = %EndTurnButton
 @onready var retreat_button: Button = %RetreatButton
@@ -82,10 +85,14 @@ func play_card_at(hand_index: int) -> Dictionary:
 func end_turn() -> Dictionary:
 	if _controller == null:
 		return {"ok": false, "reason": "战斗尚未初始化"}
+	var before: Dictionary = _controller.snapshot()
+	var resolved_intent: Dictionary = before.get("enemy_intent", {}).duplicate(true)
 	var result = _controller.end_player_turn()
-	if result.ok:
-		feedback_label.text = "敌军行动已结算，新的手牌已经发下。"
+	var after: Dictionary = _controller.snapshot()
 	_refresh()
+	if result.ok:
+		feedback_label.text = _enemy_resolution_text(resolved_intent, before, after)
+		_animate_enemy_resolution(resolved_intent, before, after)
 	return result
 
 
@@ -206,6 +213,65 @@ func _pulse_feedback(color: Color) -> void:
 	feedback_label.modulate = color
 	var tween := create_tween()
 	tween.tween_property(feedback_label, "modulate", MUTED, 0.35)
+
+
+func _enemy_resolution_text(intent: Dictionary, before: Dictionary, after: Dictionary) -> String:
+	var action_names := {"attack": "强攻", "defend": "固守", "disrupt": "扰乱", "recover": "整军"}
+	var action_name: String = action_names.get(intent.get("intent_type", "special"), "特殊行动")
+	var troop_loss := maxi(int(before.player.troops) - int(after.player.troops), 0)
+	var morale_loss := maxi(int(before.player.morale) - int(after.player.morale), 0)
+	var outcomes: Array[String] = []
+	if troop_loss > 0:
+		outcomes.append("我方兵力 -%d" % troop_loss)
+	if morale_loss > 0:
+		outcomes.append("我方士气 -%d" % morale_loss)
+	if intent.get("intent_type", "") == "defend":
+		outcomes.append("敌军护甲升至 %d" % int(after.enemy.armor))
+	if outcomes.is_empty():
+		outcomes.append("行动已完成")
+	return "敌军发动【%s】：%s。下一意图已公开。" % [action_name, "，".join(outcomes)]
+
+
+func _animate_enemy_resolution(intent: Dictionary, before: Dictionary, after: Dictionary) -> void:
+	var troop_loss := maxi(int(before.player.troops) - int(after.player.troops), 0)
+	var morale_loss := maxi(int(before.player.morale) - int(after.player.morale), 0)
+	var is_attack: bool = intent.get("intent_type", "") == "attack" or troop_loss > 0 or morale_loss > 0
+	impact_label.text = _impact_text(intent, troop_loss, morale_loss, after)
+	impact_label.modulate = DANGER if is_attack else BRONZE
+	impact_label.modulate.a = 1.0
+	impact_label.visible = true
+	var impact_start_y := impact_label.position.y
+	impact_label.position.y = impact_start_y + 8.0
+
+	var movement := create_tween()
+	var enemy_start_x := enemy_panel.position.x
+	if is_attack:
+		movement.tween_property(enemy_panel, "position:x", enemy_start_x - 30.0, 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		movement.tween_property(enemy_panel, "position:x", enemy_start_x, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		player_panel.modulate = DANGER.lightened(0.22)
+		var hit_flash := create_tween()
+		hit_flash.tween_property(player_panel, "modulate", Color.WHITE, 0.34)
+	else:
+		enemy_panel.modulate = BRONZE.lightened(0.2)
+		movement.tween_property(enemy_panel, "modulate", Color.WHITE, 0.34)
+
+	var float_text := create_tween().set_parallel(true)
+	float_text.tween_property(impact_label, "position:y", impact_start_y - 18.0, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	float_text.tween_property(impact_label, "modulate:a", 0.0, 0.55).set_delay(0.18)
+	float_text.chain().tween_callback(func(): impact_label.visible = false)
+
+
+func _impact_text(intent: Dictionary, troop_loss: int, morale_loss: int, after: Dictionary) -> String:
+	var values: Array[String] = []
+	if troop_loss > 0:
+		values.append("兵力 -%d" % troop_loss)
+	if morale_loss > 0:
+		values.append("士气 -%d" % morale_loss)
+	if not values.is_empty():
+		return "  ".join(values)
+	if intent.get("intent_type", "") == "defend":
+		return "敌军护甲 %d" % int(after.enemy.armor)
+	return "敌军行动"
 
 
 func _format_stats(combatant: Dictionary) -> String:
