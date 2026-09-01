@@ -1,0 +1,34 @@
+{
+  "id": "dev.baseline_enemy",
+  "name": "开发·基准敌军",
+  "development_only": true,
+  "troops": 600,
+  "max_troops": 600,
+  "morale": 60,
+  "max_morale": 100,
+  "attack": 20,
+  "defense": 20,
+  "army_composition": {"infantry": 1.0, "archer": 0.0, "cavalry": 0.0},
+  "skills": [
+    {
+      "id": "dev.enemy_attack",
+      "intent_type": "attack",
+      "weight": 3,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {"type": "DealDamage", "base_power": 45, "target": "opponent"}
+      ]
+    },
+    {
+      "id": "dev.enemy_guard",
+      "intent_type": "defend",
+      "weight": 1,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {"type": "GainArmor", "amount": 30, "target": "self"}
+      ]
+    }
+  ]
+}

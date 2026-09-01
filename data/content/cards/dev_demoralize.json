@@ -1,0 +1,17 @@
+{
+  "id": "dev.demoralize",
+  "name": "开发·扰乱军心",
+  "development_only": true,
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["skill", "morale"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [
+    {"type": "ModifyMorale", "amount": -25, "target": "opponent"}
+  ],
+  "upgrade_branches": [],
+  "presentation": {"description": "开发测试用士气攻击。", "icon_id": "dev.placeholder.morale"}
+}

@@ -1,0 +1,17 @@
+{
+  "id": "dev.basic_attack",
+  "name": "开发·基础攻击",
+  "development_only": true,
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["attack"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [
+    {"type": "DealDamage", "base_power": 60, "target": "opponent"}
+  ],
+  "upgrade_branches": [],
+  "presentation": {"description": "开发测试用基础兵力攻击。", "icon_id": "dev.placeholder.attack"}
+}

@@ -1,0 +1,19 @@
+{
+  "id": "dev.tactical_cycle",
+  "name": "开发·战术循环",
+  "development_only": true,
+  "rarity": "advanced",
+  "cost": 1,
+  "tags": ["skill"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [
+    {"type": "ConsumeOwnMorale", "amount": 5, "target": "self"},
+    {"type": "DrawCards", "amount": 1, "target": "self"},
+    {"type": "GainActionPoint", "amount": 1, "target": "self"}
+  ],
+  "upgrade_branches": [],
+  "presentation": {"description": "消耗5士气，抽1张牌并获得1行动力。", "icon_id": "dev.placeholder.cycle"}
+}

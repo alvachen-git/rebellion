@@ -1,0 +1,25 @@
+{
+  "id": "dev.effect_matrix",
+  "name": "开发·效果矩阵",
+  "development_only": true,
+  "rarity": "secret",
+  "cost": 0,
+  "tags": ["attack", "skill"],
+  "owner_scope": "public",
+  "copy_limit": 1,
+  "exhaust": true,
+  "conditions": [],
+  "effects": [
+    {"type": "ApplyStatus", "status_id": "dev.prepared", "stacks": 1, "target": "self"},
+    {
+      "type": "ConditionalEffect",
+      "conditions": [{"type": "HasStatus", "status_id": "dev.prepared"}],
+      "effects": [
+        {"type": "ModifyDefense", "amount": -5, "target": "opponent"},
+        {"type": "RepeatAttack", "base_power": 10, "times": 2, "target": "opponent"}
+      ]
+    }
+  ],
+  "upgrade_branches": [],
+  "presentation": {"description": "覆盖状态、条件嵌套、降防和多段攻击的开发测试牌。", "icon_id": "dev.placeholder.matrix"}
+}

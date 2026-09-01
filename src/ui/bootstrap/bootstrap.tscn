@@ -46,7 +46,7 @@ text = "架空王朝起义军"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.75, 0.69, 1)
 theme_override_font_sizes/font_size = 22
-text = "Vertical Slice · M0 工程基线"
+text = "Vertical Slice · M1 Headless 战斗内核"
 
 [node name="Separator" type="HSeparator" parent="Margin/Content"]
 layout_mode = 2
@@ -62,5 +62,5 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.58, 0.58, 0.55, 1)
 theme_override_font_sizes/font_size = 17
-text = "当前只建立技术骨架。战斗、远征和主城功能将在后续批次逐步开放。"
+text = "战斗规则内核已就绪。可交互战斗界面将在 M2 开放。"
 vertical_alignment = 1

@@ -4,10 +4,10 @@
 
 ## 当前状态
 
-- 当前阶段：M0 工程基线完成，下一步进入 M1 Headless 战斗内核
+- 当前阶段：M1 Headless 战斗内核完成，下一步进入 M2 最小战斗 UI
 - 设计基线：V0.4，已归档到 `docs/design/`
 - 技术基线：Godot 4.6.1，macOS/Windows 横屏桌面版，键鼠优先
-- 代码状态：工程骨架、内容校验、固定 Seed、Save DTO 与 Headless 测试已建立
+- 代码状态：工程骨架、内容校验、固定 Seed、Save DTO、战斗状态机与 Headless 回归已建立
 - 当前目标：按 M1～M7 逐阶段交付完整 Vertical Slice
 
 ## 核心产品定义
@@ -33,4 +33,4 @@
 
 ## 下一步
 
-进入 M1，先实现不依赖 UI 的战斗状态、伤害管线、牌堆和回合状态机。
+进入 M2，以现有 CombatController 快照和命令接口制作最小战斗 UI；正式卡牌内容仍在 M3 规格确认后实现。

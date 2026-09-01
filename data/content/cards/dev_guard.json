@@ -1,0 +1,17 @@
+{
+  "id": "dev.guard",
+  "name": "开发·防守",
+  "development_only": true,
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["skill", "defense"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [
+    {"type": "GainArmor", "amount": 40, "target": "self"}
+  ],
+  "upgrade_branches": [],
+  "presentation": {"description": "开发测试用护甲牌。", "icon_id": "dev.placeholder.guard"}
+}

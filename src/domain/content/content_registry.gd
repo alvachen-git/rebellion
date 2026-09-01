@@ -41,11 +41,13 @@ const ALLOWED_CONDITION_TYPES := {
 }
 
 var _cards: Dictionary = {}
+var _enemies: Dictionary = {}
 var _errors: PackedStringArray = []
 
 
 func load_all(manifest_path: String = DEFAULT_MANIFEST_PATH) -> bool:
 	_cards.clear()
+	_enemies.clear()
 	_errors.clear()
 	var manifest_result := _load_json_object(manifest_path)
 	if not manifest_result.ok:
@@ -65,6 +67,15 @@ func load_all(manifest_path: String = DEFAULT_MANIFEST_PATH) -> bool:
 			_errors.append("%s: card path must be a string" % manifest_path)
 			continue
 		_load_card(raw_path)
+	var enemy_paths = manifest.get("enemies", [])
+	if not enemy_paths is Array:
+		_errors.append("%s: enemies must be an array" % manifest_path)
+		return false
+	for raw_path in enemy_paths:
+		if not raw_path is String:
+			_errors.append("%s: enemy path must be a string" % manifest_path)
+			continue
+		_load_enemy(raw_path)
 
 	return _errors.is_empty()
 
@@ -110,6 +121,18 @@ func card_count() -> int:
 	return _cards.size()
 
 
+func has_enemy(enemy_id: String) -> bool:
+	return _enemies.has(enemy_id)
+
+
+func get_enemy(enemy_id: String) -> Dictionary:
+	return _enemies.get(enemy_id, {}).duplicate(true)
+
+
+func enemy_count() -> int:
+	return _enemies.size()
+
+
 func get_errors() -> PackedStringArray:
 	return _errors.duplicate()
 
@@ -129,6 +152,42 @@ func _load_card(path: String) -> void:
 		_errors.append("%s: duplicate card id '%s'" % [path, card_id])
 		return
 	_cards[card_id] = card
+
+
+func _load_enemy(path: String) -> void:
+	var enemy_result := _load_json_object(path)
+	if not enemy_result.ok:
+		_errors.append(enemy_result.error)
+		return
+	var enemy: Dictionary = enemy_result.value
+	var required_fields := ["id", "name", "troops", "morale", "attack", "defense", "army_composition", "skills"]
+	for field in required_fields:
+		if not enemy.has(field):
+			_errors.append("%s: missing enemy field '%s'" % [path, field])
+	if not enemy.get("skills", null) is Array or enemy.get("skills", []).is_empty():
+		_errors.append("%s: enemy skills must be a non-empty array" % path)
+	else:
+		for index in enemy.skills.size():
+			var skill = enemy.skills[index]
+			if not skill is Dictionary:
+				_errors.append("%s: skill[%d] must be an object" % [path, index])
+				continue
+			for field in ["id", "intent_type", "weight", "effects"]:
+				if not skill.has(field):
+					_errors.append("%s: skill[%d] missing field '%s'" % [path, index, field])
+			if skill.get("effects", null) is Array:
+				for effect_index in skill.effects.size():
+					_validate_typed_entry(skill.effects[effect_index], path, "skill effect", effect_index, ALLOWED_EFFECT_TYPES, _errors)
+	if not _errors.is_empty():
+		return
+	var enemy_id: String = enemy.get("id", "")
+	if enemy_id.is_empty():
+		_errors.append("%s: enemy id must be a non-empty string" % path)
+		return
+	if _enemies.has(enemy_id):
+		_errors.append("%s: duplicate enemy id '%s'" % [path, enemy_id])
+		return
+	_enemies[enemy_id] = enemy
 
 
 func _load_json_object(path: String) -> Dictionary:

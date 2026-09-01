@@ -1,6 +1,14 @@
 {
   "content_version": "0.1.0-m0",
   "cards": [
-    "res://data/content/cards/m0_validation_sample.json"
+    "res://data/content/cards/m0_validation_sample.json",
+    "res://data/content/cards/dev_basic_attack.json",
+    "res://data/content/cards/dev_guard.json",
+    "res://data/content/cards/dev_demoralize.json",
+    "res://data/content/cards/dev_tactical_cycle.json",
+    "res://data/content/cards/dev_effect_matrix.json"
+  ],
+  "enemies": [
+    "res://data/content/enemies/dev_baseline_enemy.json"
   ]
 }
