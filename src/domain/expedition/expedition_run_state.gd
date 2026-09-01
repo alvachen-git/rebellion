@@ -126,6 +126,8 @@ func begin_combat(enemy: Dictionary, battle_seed: int) -> Dictionary:
 		return _failure("当前节点不是战斗节点")
 	if enemy.is_empty() or String(enemy.get("id", "")).is_empty():
 		return _failure("敌军定义不能为空")
+	if node.get("node_type", "") == "boss" and enemy.get("id", "") != node.get("enemy_id", ""):
+		return _failure("Boss 节点必须使用配置的敌军")
 	var player: Dictionary = _state.general.duplicate(true)
 	player.armor = 0
 	var consumed_buff_ids: Array[String] = []
@@ -137,13 +139,16 @@ func begin_combat(enemy: Dictionary, battle_seed: int) -> Dictionary:
 				player.attack = float(player.attack) + float(buff.amount)
 		consumed_buff_ids.append(buff.id)
 	_state.temporary_buffs.clear()
+	var request_boss_modifiers := {}
+	if node.get("node_type", "") == "boss":
+		request_boss_modifiers = _state.boss_modifiers.duplicate(true)
 	_pending_combat_request = {
 		"battle_id": "%s:%s" % [_state.run_id, node.id],
 		"seed": battle_seed,
 		"player": player,
 		"enemy": enemy.duplicate(true),
 		"deck": _state.deck.duplicate(),
-		"boss_modifiers": _state.boss_modifiers.duplicate(true),
+		"boss_modifiers": request_boss_modifiers,
 		"expedition_context": {
 			"run_id": _state.run_id,
 			"node_id": node.id,
@@ -171,10 +176,15 @@ func apply_victory_result(result: Dictionary) -> Dictionary:
 		return _failure("CombatResult 剩余兵力越界")
 	if morale <= 0 or morale > int(_state.general.max_morale):
 		return _failure("CombatResult 剩余士气越界")
+	var completed_node: Dictionary = _route.current_node()
 	_state.general.troops = troops
 	_state.general.morale = morale
 	_state.general.armor = 0
 	_state.completed_battles = int(_state.completed_battles) + 1
+	if completed_node.get("node_type", "") == "military_objective":
+		var objective_id: String = completed_node.get("objective_id", "")
+		if not objective_id.is_empty():
+			_state.boss_modifiers[objective_id] = true
 	var route_result: Dictionary = _route.complete_current_node()
 	if not route_result.ok:
 		return route_result
