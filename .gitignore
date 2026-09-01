@@ -1,0 +1,11 @@
+.DS_Store
+*.log
+*.tmp
+*.bak
+.idea/
+.vscode/
+build/
+dist/
+coverage/
+
+# 引擎专用忽略项在 D-001 确认后补充。
