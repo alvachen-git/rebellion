@@ -27,6 +27,14 @@ static func evaluate(condition: Dictionary, context: Dictionary) -> Dictionary:
 		"OwnMoraleAtLeast":
 			var value := int(condition.get("value", 0))
 			return _result(int(actor.get("morale", 0)) >= value, "我方士气需要至少%d" % value)
+		"OwnMoraleAtMost":
+			var value := int(condition.get("value", 0))
+			return _result(int(actor.get("morale", 0)) <= value, "自身士气需要不高于%d" % value)
+		"OwnTroopRatioAtMost":
+			var ratio := float(condition.get("ratio", 1.0))
+			var max_troops := maxi(int(actor.get("max_troops", 1)), 1)
+			var actual_ratio := float(actor.get("troops", 0)) / float(max_troops)
+			return _result(actual_ratio <= ratio, "自身兵力需要不高于%d%%" % roundi(ratio * 100.0))
 		"EnemyMoraleAtMost":
 			var value := int(condition.get("value", 0))
 			return _result(int(target.get("morale", 0)) <= value, "敌方士气需要不高于%d" % value)

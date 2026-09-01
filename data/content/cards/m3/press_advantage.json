@@ -1,0 +1,17 @@
+{
+  "id": "card.public.morale.press_advantage",
+  "name": "乘胜追击",
+  "rarity": "advanced",
+  "cost": 1,
+  "tags": ["attack", "morale"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": false,
+  "conditions": [{"type": "EnemyMoraleAtMost", "value": 40}],
+  "effects": [{"type": "DealDamage", "base_power": 65, "target": "opponent"}, {"type": "GainActionPoint", "amount": 1, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "urge_forward", "name": "催阵", "overrides": {"effects": [{"type": "DealDamage", "base_power": 65, "target": "opponent"}, {"type": "GainActionPoint", "amount": 1, "target": "self"}, {"type": "DrawCards", "amount": 1, "target": "self"}]}},
+    {"id": "crush_vanguard", "name": "摧锋", "overrides": {"effects": [{"type": "DealDamage", "base_power": 100, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "敌军士气不高于40时发动，并接续1点行动力。", "icon_id": "m3.morale.press_advantage"}
+}

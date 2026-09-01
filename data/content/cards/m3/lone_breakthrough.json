@@ -1,0 +1,17 @@
+{
+  "id": "card.general.zhao_lie.lone_breakthrough",
+  "name": "独胆破阵",
+  "rarity": "rare",
+  "cost": 2,
+  "tags": ["attack", "cavalry", "multi_hit", "exclusive"],
+  "owner_scope": "general:general.zhao_lie",
+  "copy_limit": 1,
+  "exhaust": true,
+  "conditions": [{"type": "ArmyRatioAtLeast", "army_type": "cavalry", "ratio": 0.5}, {"type": "AttackCardsPlayedThisTurnAtLeast", "value": 2}],
+  "effects": [{"type": "RepeatAttack", "base_power": 38, "times": 3, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "rush_through", "name": "横冲", "overrides": {"cost": 1, "effects": [{"type": "RepeatAttack", "base_power": 30, "times": 3, "target": "opponent"}]}},
+    {"id": "break_formation", "name": "陷阵", "overrides": {"effects": [{"type": "RepeatAttack", "base_power": 42, "times": 4, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "本回合已打出两张攻击牌后，以三段突击完成破阵。", "icon_id": "m3.zhao_lie.lone_breakthrough"}
+}

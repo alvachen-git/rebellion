@@ -1,0 +1,17 @@
+{
+  "id": "card.public.archery.repeating_crossbow",
+  "name": "连弩",
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["attack", "archery", "multi_hit"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [{"type": "ArmyRatioAtLeast", "army_type": "archer", "ratio": 0.3}],
+  "effects": [{"type": "RepeatAttack", "base_power": 25, "times": 3, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "dense_shot", "name": "密射", "overrides": {"effects": [{"type": "RepeatAttack", "base_power": 20, "times": 5, "target": "opponent"}]}},
+    {"id": "strong_mechanism", "name": "强机", "overrides": {"effects": [{"type": "RepeatAttack", "base_power": 38, "times": 2, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "弓兵不少于30%时，以连弩发动三段攻击。", "icon_id": "m3.archery.repeating_crossbow"}
+}

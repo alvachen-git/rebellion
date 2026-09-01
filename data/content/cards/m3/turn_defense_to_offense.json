@@ -1,0 +1,17 @@
+{
+  "id": "card.public.defense.turn_defense_to_offense",
+  "name": "反守为攻",
+  "rarity": "advanced",
+  "cost": 2,
+  "tags": ["attack", "defense"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": false,
+  "conditions": [{"type": "ArmorAtLeast", "value": 80}],
+  "effects": [{"type": "ConvertArmorToDamage", "ratio": 1.1, "consume_ratio": 1.0, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "retain_momentum", "name": "留势", "overrides": {"effects": [{"type": "ConvertArmorToDamage", "ratio": 1.25, "consume_ratio": 0.5, "target": "opponent"}]}},
+    {"id": "commit_formation", "name": "倾阵", "overrides": {"effects": [{"type": "ConvertArmorToDamage", "ratio": 1.5, "consume_ratio": 1.0, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "护甲至少80时，将护甲转化为一次兵力攻击。", "icon_id": "m3.defense.turn_defense_to_offense"}
+}

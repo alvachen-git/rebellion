@@ -1,0 +1,8 @@
+{
+  "id": "talent.han_yue.pierce_formation",
+  "name": "穿阵",
+  "owner_general_id": "general.han_yue",
+  "trigger": {"type": "FirstTaggedAttackCard", "tag": "archery", "per_turn_limit": 1, "timing": "before_card_effects"},
+  "effects": [{"type": "ModifyDefense", "amount": -4, "target": "opponent"}],
+  "presentation": {"description": "每回合第一张弓弩攻击牌结算前，额外使敌军防御降低4。"}
+}

@@ -1,0 +1,8 @@
+{
+  "id": "talent.zhou_jing.iron_wall",
+  "name": "铁壁",
+  "owner_general_id": "general.zhou_jing",
+  "trigger": {"type": "FirstArmorGainedFromCard", "per_turn_limit": 1},
+  "effects": [{"type": "GainArmor", "amount": 40, "target": "self"}],
+  "presentation": {"description": "每回合第一次通过卡牌获得护甲时，额外获得40护甲。"}
+}

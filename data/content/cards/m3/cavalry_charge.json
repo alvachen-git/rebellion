@@ -1,0 +1,20 @@
+{
+  "id": "card.public.cavalry.charge",
+  "name": "骑兵突击",
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["attack", "cavalry"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [{"type": "ArmyRatioAtLeast", "army_type": "cavalry", "ratio": 0.3}],
+  "effects": [
+    {"type": "DealDamage", "base_power": 70, "target": "opponent"},
+    {"type": "ConditionalEffect", "conditions": [{"type": "EnemyMoraleAtMost", "value": 40}], "effects": [{"type": "DealDamage", "base_power": 40, "target": "opponent"}]}
+  ],
+  "upgrade_branches": [
+    {"id": "swift_assault", "name": "疾袭", "overrides": {"cost": 0, "effects": [{"type": "DealDamage", "base_power": 50, "target": "opponent"}, {"type": "ConditionalEffect", "conditions": [{"type": "EnemyMoraleAtMost", "value": 40}], "effects": [{"type": "DealDamage", "base_power": 20, "target": "opponent"}]}]}},
+    {"id": "break_army", "name": "破军", "overrides": {"effects": [{"type": "DealDamage", "base_power": 70, "target": "opponent"}, {"type": "ConditionalEffect", "conditions": [{"type": "EnemyMoraleAtMost", "value": 40}], "effects": [{"type": "DealDamage", "base_power": 75, "target": "opponent"}]}]}}
+  ],
+  "presentation": {"description": "敌军士气不高于40时追加一次突击伤害。", "icon_id": "m3.cavalry.charge"}
+}

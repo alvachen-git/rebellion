@@ -1,0 +1,17 @@
+{
+  "id": "card.public.morale.feint",
+  "name": "虚张声势",
+  "rarity": "basic",
+  "cost": 0,
+  "tags": ["skill", "morale"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": true,
+  "conditions": [],
+  "effects": [{"type": "ModifyMorale", "amount": -7, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "misdirect", "name": "声东击西", "overrides": {"effects": [{"type": "ModifyMorale", "amount": -11, "target": "opponent"}]}},
+    {"id": "sustained_pressure", "name": "反复施压", "overrides": {"cost": 1, "exhaust": false, "effects": [{"type": "ModifyMorale", "amount": -8, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "用一次无成本佯动打开军心缺口。", "icon_id": "m3.morale.feint"}
+}

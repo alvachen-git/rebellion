@@ -1,0 +1,23 @@
+{
+  "id": "general.han_yue",
+  "name": "韩月",
+  "martial": 70,
+  "leadership": 80,
+  "administration": 61,
+  "talent_id": "talent.han_yue.pierce_formation",
+  "combat": {"troops": 1100, "morale": 82, "attack": 28, "defense": 25},
+  "army_composition": {"infantry": 0.25, "archer": 0.65, "cavalry": 0.1},
+  "starting_deck": [
+    "card.public.general.assault", "card.public.general.assault", "card.public.general.assault",
+    "card.public.general.guard", "card.public.general.guard",
+    "card.public.general.inspire", "card.public.general.inspire",
+    "card.public.general.change_orders",
+    "card.public.morale.feint",
+    "card.public.morale.war_cry", "card.public.morale.war_cry",
+    "card.public.archery.armor_piercing_arrow", "card.public.archery.armor_piercing_arrow", "card.public.archery.armor_piercing_arrow",
+    "card.public.archery.repeating_crossbow", "card.public.archery.repeating_crossbow", "card.public.archery.repeating_crossbow",
+    "card.public.archery.prepared_volley", "card.public.archery.prepared_volley",
+    "card.general.han_yue.formation_breaking_crossbow"
+  ],
+  "presentation": {"build_name": "弓弩持续破甲", "description": "持续降低敌军防御，让箭阵强化后的多段弓弩攻击完成爆发。"}
+}

@@ -1,0 +1,22 @@
+{
+  "id": "general.zhou_jing",
+  "name": "周靖",
+  "martial": 58,
+  "leadership": 88,
+  "administration": 47,
+  "talent_id": "talent.zhou_jing.iron_wall",
+  "combat": {"troops": 1250, "morale": 88, "attack": 22, "defense": 34},
+  "army_composition": {"infantry": 0.75, "archer": 0.15, "cavalry": 0.1},
+  "starting_deck": [
+    "card.public.general.assault", "card.public.general.assault", "card.public.general.assault",
+    "card.public.general.guard", "card.public.general.guard", "card.public.general.guard",
+    "card.public.general.inspire", "card.public.general.inspire",
+    "card.public.general.change_orders",
+    "card.public.morale.feint", "card.public.morale.feint",
+    "card.public.defense.shield_wall", "card.public.defense.shield_wall", "card.public.defense.shield_wall",
+    "card.public.defense.counter_stance", "card.public.defense.counter_stance", "card.public.defense.counter_stance",
+    "card.public.defense.turn_defense_to_offense", "card.public.defense.turn_defense_to_offense",
+    "card.general.zhou_jing.delayed_strike"
+  ],
+  "presentation": {"build_name": "重步防御反击", "description": "通过高护甲承受敌军攻势，再以反击或护甲转伤害完成爆发。"}
+}

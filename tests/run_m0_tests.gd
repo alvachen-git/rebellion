@@ -39,7 +39,7 @@ func _test_project_baseline() -> void:
 func _test_content_registry_loads_sample() -> void:
 	var registry := ContentRegistryScript.new()
 	_assert_true(registry.load_all(), "content manifest loads without validation errors")
-	_assert_equal(registry.card_count(), 6, "development card definitions are registered")
+	_assert_true(registry.card_count() >= 6, "development card definitions remain registered alongside later content")
 	_assert_true(registry.has_card("dev.m0_validation_sample"), "sample card is addressable by stable id")
 	_assert_equal(registry.enemy_count(), 1, "one baseline enemy is registered")
 	_assert_true(registry.has_enemy("dev.baseline_enemy"), "baseline enemy is addressable by stable id")

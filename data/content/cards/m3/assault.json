@@ -1,0 +1,17 @@
+{
+  "id": "card.public.general.assault",
+  "name": "猛攻",
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["attack", "general"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [{"type": "DealDamage", "base_power": 60, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "swift", "name": "疾攻", "overrides": {"cost": 0, "effects": [{"type": "DealDamage", "base_power": 40, "target": "opponent"}]}},
+    {"id": "break_momentum", "name": "破势", "overrides": {"effects": [{"type": "DealDamage", "base_power": 80, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "发动一次可靠的正面攻势。", "icon_id": "m3.general.assault"}
+}

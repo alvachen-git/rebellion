@@ -1,0 +1,8 @@
+{
+  "id": "talent.zhao_lie.break_formation",
+  "name": "陷阵",
+  "owner_general_id": "general.zhao_lie",
+  "trigger": {"type": "NthAttackCardPlayed", "count": 3, "per_turn_limit": 1},
+  "effects": [{"type": "GainActionPoint", "amount": 1, "target": "self"}],
+  "presentation": {"description": "每回合打出第3张攻击牌后获得1行动力，每回合最多一次。"}
+}

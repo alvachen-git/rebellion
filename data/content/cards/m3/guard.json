@@ -1,0 +1,17 @@
+{
+  "id": "card.public.general.guard",
+  "name": "坚守",
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["skill", "defense", "general"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [{"type": "GainArmor", "amount": 55, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "thick_formation", "name": "厚阵", "overrides": {"effects": [{"type": "GainArmor", "amount": 80, "target": "self"}]}},
+    {"id": "adaptive_guard", "name": "守中有变", "overrides": {"effects": [{"type": "GainArmor", "amount": 45, "target": "self"}, {"type": "DrawCards", "amount": 1, "target": "self"}]}}
+  ],
+  "presentation": {"description": "整顿阵线，抵挡下一次敌军行动。", "icon_id": "m3.general.guard"}
+}

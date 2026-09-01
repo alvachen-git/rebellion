@@ -1,0 +1,20 @@
+{
+  "id": "card.public.morale.war_cry",
+  "name": "鼓噪攻心",
+  "rarity": "advanced",
+  "cost": 1,
+  "tags": ["skill", "morale"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [
+    {"type": "ConditionalEffect", "conditions": [{"type": "EnemyMoraleLostThisTurnAtLeast", "value": 8}], "effects": [{"type": "ModifyMorale", "amount": -8, "target": "opponent"}]},
+    {"type": "ModifyMorale", "amount": -11, "target": "opponent"}
+  ],
+  "upgrade_branches": [
+    {"id": "terrify", "name": "震胆", "overrides": {"effects": [{"type": "ConditionalEffect", "conditions": [{"type": "EnemyMoraleLostThisTurnAtLeast", "value": 8}], "effects": [{"type": "ModifyMorale", "amount": -8, "target": "opponent"}]}, {"type": "ModifyMorale", "amount": -15, "target": "opponent"}]}},
+    {"id": "answering_cries", "name": "群声相应", "overrides": {"effects": [{"type": "ConditionalEffect", "conditions": [{"type": "EnemyMoraleLostThisTurnAtLeast", "value": 5}], "effects": [{"type": "ModifyMorale", "amount": -10, "target": "opponent"}]}, {"type": "ModifyMorale", "amount": -11, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "敌军本回合已经动摇时，额外打击其士气。", "icon_id": "m3.morale.war_cry"}
+}

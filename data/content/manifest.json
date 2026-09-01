@@ -1,14 +1,43 @@
 {
-  "content_version": "0.1.0-m0",
+  "content_version": "0.2.0-m3-content-contract",
   "cards": [
     "res://data/content/cards/m0_validation_sample.json",
     "res://data/content/cards/dev_basic_attack.json",
     "res://data/content/cards/dev_guard.json",
     "res://data/content/cards/dev_demoralize.json",
     "res://data/content/cards/dev_tactical_cycle.json",
-    "res://data/content/cards/dev_effect_matrix.json"
+    "res://data/content/cards/dev_effect_matrix.json",
+    "res://data/content/cards/m3/assault.json",
+    "res://data/content/cards/m3/guard.json",
+    "res://data/content/cards/m3/inspire.json",
+    "res://data/content/cards/m3/change_orders.json",
+    "res://data/content/cards/m3/feint.json",
+    "res://data/content/cards/m3/war_cry.json",
+    "res://data/content/cards/m3/press_advantage.json",
+    "res://data/content/cards/m3/cavalry_harass.json",
+    "res://data/content/cards/m3/cavalry_charge.json",
+    "res://data/content/cards/m3/cavalry_pursue.json",
+    "res://data/content/cards/m3/shield_wall.json",
+    "res://data/content/cards/m3/counter_stance.json",
+    "res://data/content/cards/m3/turn_defense_to_offense.json",
+    "res://data/content/cards/m3/armor_piercing_arrow.json",
+    "res://data/content/cards/m3/repeating_crossbow.json",
+    "res://data/content/cards/m3/prepared_volley.json",
+    "res://data/content/cards/m3/lone_breakthrough.json",
+    "res://data/content/cards/m3/delayed_strike.json",
+    "res://data/content/cards/m3/formation_breaking_crossbow.json"
   ],
   "enemies": [
     "res://data/content/enemies/dev_baseline_enemy.json"
+  ],
+  "talents": [
+    "res://data/content/talents/zhao_lie_break_formation.json",
+    "res://data/content/talents/zhou_jing_iron_wall.json",
+    "res://data/content/talents/han_yue_pierce_formation.json"
+  ],
+  "generals": [
+    "res://data/content/generals/zhao_lie.json",
+    "res://data/content/generals/zhou_jing.json",
+    "res://data/content/generals/han_yue.json"
   ]
 }

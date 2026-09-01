@@ -1,0 +1,23 @@
+{
+  "id": "general.zhao_lie",
+  "name": "赵烈",
+  "martial": 84,
+  "leadership": 72,
+  "administration": 24,
+  "talent_id": "talent.zhao_lie.break_formation",
+  "combat": {"troops": 1050, "morale": 78, "attack": 34, "defense": 18},
+  "army_composition": {"infantry": 0.2, "archer": 0.1, "cavalry": 0.7},
+  "starting_deck": [
+    "card.public.general.assault", "card.public.general.assault", "card.public.general.assault",
+    "card.public.general.guard", "card.public.general.guard",
+    "card.public.general.inspire", "card.public.general.inspire",
+    "card.public.general.change_orders",
+    "card.public.morale.feint", "card.public.morale.feint",
+    "card.public.morale.war_cry", "card.public.morale.war_cry",
+    "card.public.morale.press_advantage", "card.public.morale.press_advantage",
+    "card.public.cavalry.harass", "card.public.cavalry.harass", "card.public.cavalry.harass",
+    "card.public.cavalry.charge", "card.public.cavalry.charge",
+    "card.general.zhao_lie.lone_breakthrough"
+  ],
+  "presentation": {"build_name": "骑兵低士气连击", "description": "以攻心铺垫低士气门槛，再通过低费骑兵牌和第三张攻击返行动力完成连击。"}
+}

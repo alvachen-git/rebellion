@@ -1,0 +1,17 @@
+{
+  "id": "card.public.general.change_orders",
+  "name": "临阵换令",
+  "rarity": "advanced",
+  "cost": 0,
+  "tags": ["skill", "general"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": true,
+  "conditions": [],
+  "effects": [{"type": "DrawCards", "amount": 2, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "rapid_order", "name": "疾令", "overrides": {"effects": [{"type": "DrawCards", "amount": 3, "target": "self"}]}},
+    {"id": "flexible_order", "name": "从容易令", "overrides": {"cost": 1, "exhaust": false}}
+  ],
+  "presentation": {"description": "立即调整手牌，但本场只能使用一次。", "icon_id": "m3.general.change_orders"}
+}

@@ -1,0 +1,17 @@
+{
+  "id": "card.general.han_yue.formation_breaking_crossbow",
+  "name": "破阵连弩",
+  "rarity": "rare",
+  "cost": 2,
+  "tags": ["attack", "archery", "armor_break", "multi_hit", "exclusive"],
+  "owner_scope": "general:general.han_yue",
+  "copy_limit": 1,
+  "exhaust": true,
+  "conditions": [{"type": "ArmyRatioAtLeast", "army_type": "archer", "ratio": 0.5}],
+  "effects": [{"type": "ModifyDefense", "amount": -8, "target": "opponent"}, {"type": "RepeatAttack", "base_power": 28, "times": 4, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "pierce_camp", "name": "穿营", "overrides": {"effects": [{"type": "ModifyDefense", "amount": -12, "target": "opponent"}, {"type": "RepeatAttack", "base_power": 25, "times": 4, "target": "opponent"}]}},
+    {"id": "final_string", "name": "绝弦", "overrides": {"effects": [{"type": "RepeatAttack", "base_power": 40, "times": 4, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "弓兵不少于50%时，先破防再发动四段连弩攻击。", "icon_id": "m3.han_yue.formation_breaking_crossbow"}
+}

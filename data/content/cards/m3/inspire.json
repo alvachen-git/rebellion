@@ -1,0 +1,17 @@
+{
+  "id": "card.public.general.inspire",
+  "name": "鼓舞",
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["skill", "morale", "general"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [{"type": "ModifyMorale", "amount": 14, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "rouse", "name": "振奋军心", "overrides": {"effects": [{"type": "ModifyMorale", "amount": 22, "target": "self"}]}},
+    {"id": "signal_all", "name": "传令全军", "overrides": {"effects": [{"type": "ModifyMorale", "amount": 12, "target": "self"}, {"type": "DrawCards", "amount": 1, "target": "self"}]}}
+  ],
+  "presentation": {"description": "恢复军心，为高士气战术重新蓄力。", "icon_id": "m3.general.inspire"}
+}

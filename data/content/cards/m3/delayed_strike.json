@@ -1,0 +1,17 @@
+{
+  "id": "card.general.zhou_jing.delayed_strike",
+  "name": "后发制人",
+  "rarity": "rare",
+  "cost": 1,
+  "tags": ["attack", "defense", "exclusive"],
+  "owner_scope": "general:general.zhou_jing",
+  "copy_limit": 1,
+  "exhaust": true,
+  "conditions": [{"type": "ArmorAtLeast", "value": 80}],
+  "effects": [{"type": "DealDamageFromArmor", "ratio": 1.0, "clear_armor_after": false, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "enduring_guard", "name": "守势不绝", "overrides": {"exhaust": false, "effects": [{"type": "DealDamageFromArmor", "ratio": 0.7, "clear_armor_after": false, "target": "opponent"}]}},
+    {"id": "decisive_blow", "name": "一击破敌", "overrides": {"effects": [{"type": "DealDamageFromArmor", "ratio": 1.4, "clear_armor_after": true, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "护甲至少80时，以当前护甲形成一次不消耗护甲的攻击。", "icon_id": "m3.zhou_jing.delayed_strike"}
+}

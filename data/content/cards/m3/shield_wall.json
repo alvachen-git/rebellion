@@ -1,0 +1,17 @@
+{
+  "id": "card.public.defense.shield_wall",
+  "name": "盾阵",
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["skill", "defense", "infantry"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [{"type": "ArmyRatioAtLeast", "army_type": "infantry", "ratio": 0.4}],
+  "effects": [{"type": "GainArmor", "amount": 75, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "heavy_shields", "name": "重盾", "overrides": {"effects": [{"type": "GainArmor", "amount": 105, "target": "self"}]}},
+    {"id": "rotation", "name": "轮替", "overrides": {"effects": [{"type": "GainArmor", "amount": 65, "target": "self"}, {"type": "DrawCards", "amount": 1, "target": "self"}]}}
+  ],
+  "presentation": {"description": "步兵不少于40%时，以重盾建立坚固阵线。", "icon_id": "m3.defense.shield_wall"}
+}

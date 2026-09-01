@@ -1,0 +1,17 @@
+{
+  "id": "card.public.archery.armor_piercing_arrow",
+  "name": "破甲箭",
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["attack", "archery", "armor_break"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [{"type": "ArmyRatioAtLeast", "army_type": "archer", "ratio": 0.3}],
+  "effects": [{"type": "ModifyDefense", "amount": -6, "target": "opponent"}, {"type": "DealDamage", "base_power": 45, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "awl_head", "name": "锥锋", "overrides": {"effects": [{"type": "ModifyDefense", "amount": -10, "target": "opponent"}, {"type": "DealDamage", "base_power": 40, "target": "opponent"}]}},
+    {"id": "strong_crossbow", "name": "劲弩", "overrides": {"effects": [{"type": "ModifyDefense", "amount": -4, "target": "opponent"}, {"type": "DealDamage", "base_power": 75, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "弓兵不少于30%时，先降低敌军防御再造成伤害。", "icon_id": "m3.archery.armor_piercing_arrow"}
+}

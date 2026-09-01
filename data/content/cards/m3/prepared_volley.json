@@ -1,0 +1,17 @@
+{
+  "id": "card.public.archery.prepared_volley",
+  "name": "箭阵待发",
+  "rarity": "advanced",
+  "cost": 1,
+  "tags": ["skill", "archery", "prepare"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": false,
+  "conditions": [{"type": "ArmyRatioAtLeast", "army_type": "archer", "ratio": 0.4}],
+  "effects": [{"type": "PrepareTaggedAttack", "tag": "archery", "multiplier": 1.35, "uses": 1, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "strong_string", "name": "强弦", "overrides": {"effects": [{"type": "PrepareTaggedAttack", "tag": "archery", "multiplier": 1.6, "uses": 1, "target": "self"}]}},
+    {"id": "sustained_formation", "name": "续阵", "overrides": {"effects": [{"type": "PrepareTaggedAttack", "tag": "archery", "multiplier": 1.2, "uses": 2, "target": "self"}]}}
+  ],
+  "presentation": {"description": "弓兵不少于40%时，强化下一张弓弩攻击牌的每段伤害。", "icon_id": "m3.archery.prepared_volley"}
+}

@@ -1,0 +1,17 @@
+{
+  "id": "card.public.cavalry.pursue",
+  "name": "追亡逐北",
+  "rarity": "rare",
+  "cost": 1,
+  "tags": ["attack", "cavalry"],
+  "owner_scope": "public",
+  "copy_limit": 1,
+  "exhaust": true,
+  "conditions": [{"type": "ArmyRatioAtLeast", "army_type": "cavalry", "ratio": 0.4}, {"type": "EnemyMoraleAtMost", "value": 20}],
+  "effects": [{"type": "DealDamage", "base_power": 115, "target": "opponent"}, {"type": "DrawCards", "amount": 1, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "relentless_pursuit", "name": "穷追", "overrides": {"exhaust": false, "effects": [{"type": "DealDamage", "base_power": 85, "target": "opponent"}, {"type": "DrawCards", "amount": 1, "target": "self"}]}},
+    {"id": "rout", "name": "震溃", "overrides": {"conditions": [{"type": "ArmyRatioAtLeast", "army_type": "cavalry", "ratio": 0.4}, {"type": "EnemyMoraleAtMost", "value": 30}], "effects": [{"type": "DealDamage", "base_power": 115, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "骑兵不少于40%、敌军士气不高于20时发动追击。", "icon_id": "m3.cavalry.pursue"}
+}
