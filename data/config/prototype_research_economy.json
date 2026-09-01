@@ -1,0 +1,37 @@
+{
+  "id": "research_economy.vertical_slice",
+  "balance_status": "prototype_temporary",
+  "eligible_public_card_ids": [
+    "card.public.general.assault",
+    "card.public.general.guard",
+    "card.public.general.inspire",
+    "card.public.general.change_orders",
+    "card.public.morale.feint",
+    "card.public.morale.war_cry",
+    "card.public.morale.press_advantage",
+    "card.public.cavalry.harass",
+    "card.public.cavalry.charge",
+    "card.public.cavalry.pursue",
+    "card.public.defense.shield_wall",
+    "card.public.defense.counter_stance",
+    "card.public.defense.turn_defense_to_offense",
+    "card.public.archery.armor_piercing_arrow",
+    "card.public.archery.repeating_crossbow",
+    "card.public.archery.prepared_volley"
+  ],
+  "unlock_costs_by_rarity": {
+    "basic": {"silver": 40, "military_knowledge": 20},
+    "advanced": {"silver": 80, "military_knowledge": 45},
+    "rare": {"silver": 140, "military_knowledge": 80},
+    "secret": {"silver": 220, "military_knowledge": 130}
+  },
+  "upgrade_costs_by_rarity": {
+    "basic": {"silver": 70, "military_knowledge": 40},
+    "advanced": {"silver": 120, "military_knowledge": 70},
+    "rare": {"silver": 200, "military_knowledge": 120},
+    "secret": {"silver": 300, "military_knowledge": 180}
+  },
+  "special_unlock_costs": {
+    "card.public.cavalry.pursue": {"resource.cavalry_fragment": 1}
+  }
+}

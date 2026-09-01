@@ -2,6 +2,7 @@ extends RefCounted
 class_name CampaignState
 
 const ArmyManagementServiceScript := preload("res://src/domain/campaign/army_management_service.gd")
+const ResearchManagementServiceScript := preload("res://src/domain/campaign/research_management_service.gd")
 const MAIN_RESOURCE_IDS := ["silver", "food", "recruits", "military_knowledge"]
 
 
@@ -22,7 +23,7 @@ static func create(campaign_id: String) -> Dictionary:
 		"unlocked_public_cards": [],
 		"card_upgrade_branches": {},
 		"territories": [],
-		"research": {},
+		"research": {"applied_action_ids": [], "history": []},
 		"applied_settlement_ids": [],
 		"settlement_history": [],
 		"pending_long_term_effects": [],
@@ -43,6 +44,8 @@ static func normalize(source: Dictionary) -> Dictionary:
 				result.resources[resource_id] = 0
 	if result.get("army_inventory", null) is Dictionary:
 		result.army_inventory = ArmyManagementServiceScript.normalize_inventory(result.army_inventory)
+	if result.get("research", null) is Dictionary:
+		result.research = ResearchManagementServiceScript.normalize_research_state(result.research)
 	return result
 
 
@@ -75,6 +78,8 @@ static func validate(state: Dictionary, source: String = "campaign") -> PackedSt
 			elif not _is_non_negative_whole_number(special_resources[resource_id]):
 				errors.append("%s: special resource '%s' cannot be negative" % [source, resource_id])
 	errors.append_array(ArmyManagementServiceScript.validate_inventory(state.get("army_inventory", null), "%s.army_inventory" % source))
+	errors.append_array(ResearchManagementServiceScript.validate_research_state(state.get("research", null), "%s.research" % source))
+	errors.append_array(ResearchManagementServiceScript.validate_card_progress(state.get("unlocked_public_cards", null), state.get("card_upgrade_branches", null), source))
 	for field in ["generals", "unlocked_public_cards", "territories", "applied_settlement_ids", "settlement_history", "pending_long_term_effects", "applied_army_action_ids", "army_history"]:
 		if not state.get(field, null) is Array:
 			errors.append("%s: %s must be an array" % [source, field])

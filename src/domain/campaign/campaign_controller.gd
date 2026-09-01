@@ -3,6 +3,7 @@ class_name CampaignController
 
 const CampaignStateScript := preload("res://src/domain/campaign/campaign_state.gd")
 const ArmyManagementServiceScript := preload("res://src/domain/campaign/army_management_service.gd")
+const ResearchManagementServiceScript := preload("res://src/domain/campaign/research_management_service.gd")
 
 const RESOURCE_KEY_BY_LOOT_ID := {
 	"resource.silver": "silver",
@@ -13,6 +14,8 @@ const RESOURCE_KEY_BY_LOOT_ID := {
 
 var _state: Dictionary = {}
 var _army_economy: Dictionary = {}
+var _research_economy: Dictionary = {}
+var _research_cards: Dictionary = {}
 
 
 func setup(campaign_source: Dictionary) -> PackedStringArray:
@@ -141,6 +144,95 @@ func replenish_troops(request: Dictionary) -> Dictionary:
 	}
 
 
+func configure_research(economy_definition: Dictionary, card_definitions: Array) -> PackedStringArray:
+	_research_economy = {}
+	_research_cards = {}
+	var errors := ResearchManagementServiceScript.validate_card_catalog(economy_definition, card_definitions)
+	if not errors.is_empty():
+		return errors
+	_research_economy = economy_definition.duplicate(true)
+	for card in card_definitions:
+		if _research_economy.eligible_public_card_ids.has(card.id):
+			_research_cards[card.id] = card.duplicate(true)
+	return errors
+
+
+func unlock_public_card(request: Dictionary) -> Dictionary:
+	var common_error := _validate_research_action_request(request, false)
+	if not common_error.is_empty():
+		return _research_action_failure(common_error)
+	var action_id: String = request.action_id
+	if _state.research.applied_action_ids.has(action_id):
+		return _research_duplicate()
+	var card_id: String = request.card_id
+	if _state.unlocked_public_cards.has(card_id):
+		return _research_action_failure("research: public card '%s' is already unlocked" % card_id)
+	var quote: Dictionary = ResearchManagementServiceScript.quote_unlock(_research_economy, _research_cards[card_id])
+	if not quote.ok:
+		return _research_failure_from_errors(quote.errors)
+	var affordability_error := _research_affordability_error(quote)
+	if not affordability_error.is_empty():
+		return _research_action_failure(affordability_error)
+	var next_state := _state.duplicate(true)
+	_deduct_research_costs(next_state, quote)
+	next_state.unlocked_public_cards.append(card_id)
+	next_state.research.applied_action_ids.append(action_id)
+	next_state.research.history.append({
+		"action_id": action_id,
+		"action": "unlock_public_card",
+		"card_id": card_id,
+		"main_costs": quote.main_costs.duplicate(true),
+		"special_costs": quote.special_costs.duplicate(true),
+	})
+	_state = next_state
+	return {"ok": true, "duplicate": false, "errors": PackedStringArray(), "main_costs": quote.main_costs, "special_costs": quote.special_costs}
+
+
+func upgrade_public_card(request: Dictionary) -> Dictionary:
+	var common_error := _validate_research_action_request(request, true)
+	if not common_error.is_empty():
+		return _research_action_failure(common_error)
+	var action_id: String = request.action_id
+	if _state.research.applied_action_ids.has(action_id):
+		return _research_duplicate()
+	var card_id: String = request.card_id
+	if not _state.unlocked_public_cards.has(card_id):
+		return _research_action_failure("research: public card '%s' must be unlocked before upgrade" % card_id)
+	if _state.card_upgrade_branches.has(card_id):
+		return _research_action_failure("research: public card '%s' already has a permanent upgrade" % card_id)
+	var branch_id: String = request.branch_id
+	var quote: Dictionary = ResearchManagementServiceScript.quote_upgrade(_research_economy, _research_cards[card_id], branch_id)
+	if not quote.ok:
+		return _research_failure_from_errors(quote.errors)
+	var affordability_error := _research_affordability_error(quote)
+	if not affordability_error.is_empty():
+		return _research_action_failure(affordability_error)
+	var next_state := _state.duplicate(true)
+	_deduct_research_costs(next_state, quote)
+	next_state.card_upgrade_branches[card_id] = branch_id
+	next_state.research.applied_action_ids.append(action_id)
+	next_state.research.history.append({
+		"action_id": action_id,
+		"action": "upgrade_public_card",
+		"card_id": card_id,
+		"branch_id": branch_id,
+		"main_costs": quote.main_costs.duplicate(true),
+		"special_costs": quote.special_costs.duplicate(true),
+	})
+	_state = next_state
+	return {"ok": true, "duplicate": false, "errors": PackedStringArray(), "main_costs": quote.main_costs, "special_costs": quote.special_costs}
+
+
+func resolved_public_card(card_id: String) -> Dictionary:
+	if _state.is_empty():
+		return {"ok": false, "errors": PackedStringArray(["campaign: controller is not initialized"]), "card": {}}
+	if not _research_cards.has(card_id):
+		return {"ok": false, "errors": PackedStringArray(["research: unknown public card '%s'" % card_id]), "card": {}}
+	if not _state.unlocked_public_cards.has(card_id):
+		return {"ok": false, "errors": PackedStringArray(["research: public card '%s' is locked" % card_id]), "card": {}}
+	return ResearchManagementServiceScript.resolve_card_definition(_research_cards[card_id], String(_state.card_upgrade_branches.get(card_id, "")))
+
+
 func _validate_settlement(request: Dictionary) -> PackedStringArray:
 	var errors := PackedStringArray()
 	for field in ["request_id", "run_id", "expedition_id", "outcome", "general_id", "remaining_troops", "remaining_morale", "general_died", "general_injured", "loot_to_bank", "lost_unbanked_loot"]:
@@ -194,3 +286,50 @@ func _is_positive_whole_number(value: Variant) -> bool:
 
 func _army_action_failure(error: String) -> Dictionary:
 	return {"ok": false, "duplicate": false, "errors": PackedStringArray([error]), "troops_added": 0, "main_costs": {}, "special_costs": {}}
+
+
+func _validate_research_action_request(request: Dictionary, requires_branch: bool) -> String:
+	if _state.is_empty():
+		return "campaign: controller is not initialized"
+	if _research_economy.is_empty() or _research_cards.is_empty():
+		return "campaign: research catalog is not configured"
+	var fields := ["action_id", "card_id"]
+	if requires_branch:
+		fields.append("branch_id")
+	for field in fields:
+		if not request.has(field):
+			return "research: missing field '%s'" % field
+		if not request[field] is String or request[field].strip_edges().is_empty():
+			return "research: %s must be a non-empty string" % field
+	if not _research_cards.has(request.card_id):
+		return "research: unknown public card '%s'" % request.card_id
+	return ""
+
+
+func _research_affordability_error(quote: Dictionary) -> String:
+	for resource_id in quote.main_costs:
+		if int(_state.resources.get(resource_id, 0)) < int(quote.main_costs[resource_id]):
+			return "research: insufficient main resource '%s'" % resource_id
+	for resource_id in quote.special_costs:
+		if int(_state.special_resources.get(resource_id, 0)) < int(quote.special_costs[resource_id]):
+			return "research: insufficient special resource '%s'" % resource_id
+	return ""
+
+
+func _deduct_research_costs(state: Dictionary, quote: Dictionary) -> void:
+	for resource_id in quote.main_costs:
+		state.resources[resource_id] = int(state.resources[resource_id]) - int(quote.main_costs[resource_id])
+	for resource_id in quote.special_costs:
+		state.special_resources[resource_id] = int(state.special_resources[resource_id]) - int(quote.special_costs[resource_id])
+
+
+func _research_action_failure(error: String) -> Dictionary:
+	return {"ok": false, "duplicate": false, "errors": PackedStringArray([error]), "main_costs": {}, "special_costs": {}}
+
+
+func _research_failure_from_errors(errors: PackedStringArray) -> Dictionary:
+	return {"ok": false, "duplicate": false, "errors": errors, "main_costs": {}, "special_costs": {}}
+
+
+func _research_duplicate() -> Dictionary:
+	return {"ok": true, "duplicate": true, "errors": PackedStringArray(), "main_costs": {}, "special_costs": {}}
