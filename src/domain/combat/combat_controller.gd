@@ -21,6 +21,8 @@ var _deck
 var _log
 var _state: Dictionary = {}
 var _result: Dictionary = {}
+var _active_player_card: Dictionary = {}
+var _active_card_damage_multiplier := 1.0
 
 
 func setup(request: Dictionary, content_registry) -> PackedStringArray:
@@ -36,6 +38,10 @@ func setup(request: Dictionary, content_registry) -> PackedStringArray:
 	_deck = DeckStateScript.new()
 	_log = CombatEventLogScript.new()
 	_deck.setup(request.deck, _deck_rng)
+	var player_source: Dictionary = request.player.duplicate(true)
+	if String(player_source.get("talent_id", "")).is_empty() and content_registry.has_general(player_source.get("id", "")):
+		player_source.talent_id = content_registry.get_general(player_source.id).get("talent_id", "")
+	var player_talent_id: String = player_source.get("talent_id", "")
 	_state = {
 		"battle_id": request.get("battle_id", "development_battle"),
 		"seed": int(request.get("seed", 0)),
@@ -44,7 +50,8 @@ func setup(request: Dictionary, content_registry) -> PackedStringArray:
 		"action_points": 0,
 		"draw_count": int(request.get("draw_count", DEFAULT_DRAW_COUNT)),
 		"starting_action_points": int(request.get("starting_action_points", DEFAULT_ACTION_POINTS)),
-		"player": _normalize_combatant(request.player),
+		"player": _normalize_combatant(player_source),
+		"player_talent": content_registry.get_talent(player_talent_id) if not player_talent_id.is_empty() else {},
 		"enemy": _normalize_combatant(request.enemy),
 		"enemy_skills": request.enemy.get("skills", []).duplicate(true),
 		"enemy_cooldowns": {},
@@ -53,6 +60,8 @@ func setup(request: Dictionary, content_registry) -> PackedStringArray:
 		"status": "active",
 	}
 	_result = {}
+	_active_player_card = {}
+	_active_card_damage_multiplier = 1.0
 	_log.record("battle_started", {"battle_id": _state.battle_id, "seed": _state.seed})
 	_start_player_turn()
 	return PackedStringArray()
@@ -81,10 +90,17 @@ func play_card(hand_index: int) -> Dictionary:
 		_state.turn_stats.attack_cards_played += 1
 	_log.record("card_played", {"card_id": card_id, "cost": cost})
 
+	_active_player_card = card
+	_active_card_damage_multiplier = 1.0
+	_try_trigger_pre_card_talent(card)
+	_active_card_damage_multiplier = _consume_prepared_attack_multiplier(card)
 	for effect in card.effects:
 		_resolve_effect(effect, "player")
 		if not is_active():
 			break
+	_try_trigger_post_card_talent(card)
+	_active_player_card = {}
+	_active_card_damage_multiplier = 1.0
 	return {"ok": true, "card_id": card_id, "result": _result.duplicate(true)}
 
 
@@ -109,12 +125,11 @@ func preview_card_damage(hand_index: int) -> int:
 	if hand_index < 0 or hand_index >= _deck.hand.size():
 		return 0
 	var card: Dictionary = _registry.get_card(_deck.hand[hand_index])
-	for effect in card.get("effects", []):
-		if effect.get("type", "") == "DealDamage":
-			return DamageCalculatorScript.preview(effect, _state.player, _state.enemy)
-		if effect.get("type", "") == "RepeatAttack":
-			return DamageCalculatorScript.preview(effect, _state.player, _state.enemy) * int(effect.get("times", 1))
-	return 0
+	var source: Dictionary = _state.player.duplicate(true)
+	var target: Dictionary = _state.enemy.duplicate(true)
+	_preview_pre_card_talent(card, source, target)
+	var multiplier := _peek_prepared_attack_multiplier(card)
+	return _preview_effect_list(card.get("effects", []), source, target, multiplier)
 
 
 func end_player_turn() -> Dictionary:
@@ -208,16 +223,18 @@ func _resolve_effect(effect: Dictionary, source_side: String) -> void:
 	var effect_type: String = effect.get("type", "")
 	match effect_type:
 		"DealDamage":
-			_apply_damage(source_side, target_side, effect)
+			_apply_damage(source_side, target_side, _with_active_damage_multiplier(effect, source_side))
 		"RepeatAttack":
 			for index in maxi(int(effect.get("times", 1)), 0):
-				_apply_damage(source_side, target_side, effect)
+				_apply_damage(source_side, target_side, _with_active_damage_multiplier(effect, source_side))
 				if not is_active():
 					break
 		"GainArmor":
 			var amount := maxi(int(effect.get("amount", 0)), 0)
 			target.armor += amount
 			_log.record("armor_gained", {"side": target_side, "amount": amount, "armor": target.armor})
+			if source_side == "player" and target_side == "player" and not _active_player_card.is_empty():
+				_try_trigger_armor_talent()
 		"ModifyMorale":
 			_apply_morale(target_side, int(effect.get("amount", 0)))
 		"ConsumeOwnMorale":
@@ -253,6 +270,43 @@ func _resolve_effect(effect: Dictionary, source_side: String) -> void:
 						break
 			else:
 				_log.record("conditional_effect_skipped", {"reason": condition_result.reason})
+		"DealDamageFromArmor":
+			var damage_effect := _armor_damage_effect(effect, source)
+			_apply_damage(source_side, target_side, _with_active_damage_multiplier(damage_effect, source_side))
+			if bool(effect.get("clear_armor_after", false)):
+				var cleared := int(source.armor)
+				source.armor = 0
+				_log.record("armor_spent", {"side": source_side, "amount": cleared, "armor": 0})
+		"ConvertArmorToDamage":
+			var consume_ratio := clampf(float(effect.get("consume_ratio", 1.0)), 0.0, 1.0)
+			var consumed := mini(roundi(float(source.armor) * consume_ratio), int(source.armor))
+			var damage_effect := effect.duplicate(true)
+			damage_effect.base_power = float(consumed) * float(effect.get("ratio", 1.0))
+			source.armor -= consumed
+			_log.record("armor_converted", {"side": source_side, "amount": consumed, "armor": source.armor})
+			_apply_damage(source_side, target_side, _with_active_damage_multiplier(damage_effect, source_side))
+		"RetaliateOnDamage":
+			var reaction := {
+				"base_power": float(effect.get("base_power", 0.0)),
+				"uses": maxi(int(effect.get("uses", 1)), 1),
+			}
+			target.retaliations.append(reaction)
+			target.statuses["m3.counter_stance"] = int(target.statuses.get("m3.counter_stance", 0)) + reaction.uses
+			_log.record("retaliation_prepared", {"side": target_side, "base_power": reaction.base_power, "uses": reaction.uses})
+		"PrepareTaggedAttack":
+			var prepared := {
+				"tag": effect.get("tag", ""),
+				"multiplier": maxf(float(effect.get("multiplier", 1.0)), 0.0),
+				"uses": maxi(int(effect.get("uses", 1)), 1),
+			}
+			target.prepared_attacks.append(prepared)
+			var status_id := "m3.prepared_attack.%s" % prepared.tag
+			target.statuses[status_id] = int(target.statuses.get(status_id, 0)) + prepared.uses
+			_log.record("tagged_attack_prepared", {"side": target_side, "tag": prepared.tag, "multiplier": prepared.multiplier, "uses": prepared.uses})
+		"RestoreTroops":
+			var before := int(target.troops)
+			target.troops = mini(before + maxi(int(effect.get("amount", 0)), 0), int(target.max_troops))
+			_log.record("troops_restored", {"side": target_side, "amount": int(target.troops) - before, "troops": target.troops})
 		_:
 			_log.record("unsupported_effect", {"type": effect_type})
 	_check_outcome()
@@ -275,6 +329,8 @@ func _apply_damage(source_side: String, target_side: String, effect: Dictionary)
 		"remaining_troops": target.troops,
 	})
 	_check_outcome()
+	if is_active() and source_side == "enemy" and target_side == "player" and calculated > 0:
+		_trigger_retaliation()
 
 
 func _apply_morale(target_side: String, amount: int) -> void:
@@ -366,6 +422,7 @@ func _normalize_combatant(source: Dictionary) -> Dictionary:
 	var morale := clampi(int(source.get("morale", MORALE_MAXIMUM)), MORALE_MINIMUM, MORALE_MAXIMUM)
 	return {
 		"id": source.get("id", "unknown"),
+		"talent_id": source.get("talent_id", ""),
 		"is_player_character": bool(source.get("is_player_character", false)),
 		"troops": maxi(int(source.get("troops", 1)), 0),
 		"max_troops": maxi(int(source.get("max_troops", source.get("troops", 1))), 1),
@@ -376,6 +433,8 @@ func _normalize_combatant(source: Dictionary) -> Dictionary:
 		"armor": maxi(int(source.get("armor", 0)), 0),
 		"army_composition": source.get("army_composition", {}).duplicate(true),
 		"statuses": source.get("statuses", {}).duplicate(true),
+		"retaliations": source.get("retaliations", []).duplicate(true),
+		"prepared_attacks": source.get("prepared_attacks", []).duplicate(true),
 	}
 
 
@@ -388,7 +447,196 @@ func _new_turn_stats() -> Dictionary:
 		"cards_played": 0,
 		"attack_cards_played": 0,
 		"enemy_morale_lost": 0,
+		"talent_triggers": {},
 	}
+
+
+func _try_trigger_pre_card_talent(card: Dictionary) -> void:
+	var talent: Dictionary = _state.get("player_talent", {})
+	if talent.is_empty() or not _talent_has_room(talent):
+		return
+	var trigger: Dictionary = talent.get("trigger", {})
+	if trigger.get("type", "") != "FirstTaggedAttackCard":
+		return
+	var tags: Array = card.get("tags", [])
+	if tags.has("attack") and tags.has(trigger.get("tag", "")):
+		_trigger_player_talent(talent)
+
+
+func _try_trigger_post_card_talent(card: Dictionary) -> void:
+	var talent: Dictionary = _state.get("player_talent", {})
+	if talent.is_empty() or not _talent_has_room(talent):
+		return
+	var trigger: Dictionary = talent.get("trigger", {})
+	if trigger.get("type", "") == "NthAttackCardPlayed" and card.get("tags", []).has("attack"):
+		if int(_state.turn_stats.attack_cards_played) == int(trigger.get("count", 0)):
+			_trigger_player_talent(talent)
+
+
+func _try_trigger_armor_talent() -> void:
+	var talent: Dictionary = _state.get("player_talent", {})
+	if talent.is_empty() or not _talent_has_room(talent):
+		return
+	if talent.get("trigger", {}).get("type", "") == "FirstArmorGainedFromCard":
+		_trigger_player_talent(talent)
+
+
+func _talent_has_room(talent: Dictionary) -> bool:
+	var talent_id: String = talent.get("id", "")
+	var counts: Dictionary = _state.turn_stats.get("talent_triggers", {})
+	return int(counts.get(talent_id, 0)) < int(talent.get("trigger", {}).get("per_turn_limit", 1))
+
+
+func _trigger_player_talent(talent: Dictionary) -> void:
+	if not is_active():
+		return
+	var talent_id: String = talent.get("id", "")
+	var counts: Dictionary = _state.turn_stats.talent_triggers
+	counts[talent_id] = int(counts.get(talent_id, 0)) + 1
+	_log.record("talent_triggered", {"talent_id": talent_id, "count": counts[talent_id]})
+	for effect in talent.get("effects", []):
+		_resolve_effect(effect, "player")
+		if not is_active():
+			break
+
+
+func _with_active_damage_multiplier(effect: Dictionary, source_side: String) -> Dictionary:
+	var resolved := effect.duplicate(true)
+	if source_side == "player" and not _active_player_card.is_empty():
+		resolved.multiplier = float(effect.get("multiplier", 1.0)) * _active_card_damage_multiplier
+	return resolved
+
+
+func _armor_damage_effect(effect: Dictionary, source: Dictionary) -> Dictionary:
+	var resolved := effect.duplicate(true)
+	resolved.base_power = float(source.armor) * float(effect.get("ratio", 1.0))
+	return resolved
+
+
+func _peek_prepared_attack_multiplier(card: Dictionary) -> float:
+	var index := _prepared_attack_index(card)
+	if index < 0:
+		return 1.0
+	return float(_state.player.prepared_attacks[index].get("multiplier", 1.0))
+
+
+func _consume_prepared_attack_multiplier(card: Dictionary) -> float:
+	var index := _prepared_attack_index(card)
+	if index < 0:
+		return 1.0
+	var prepared: Dictionary = _state.player.prepared_attacks[index]
+	var multiplier := float(prepared.get("multiplier", 1.0))
+	prepared.uses = int(prepared.get("uses", 1)) - 1
+	var status_id := "m3.prepared_attack.%s" % prepared.get("tag", "")
+	var remaining_status := maxi(int(_state.player.statuses.get(status_id, 1)) - 1, 0)
+	if remaining_status == 0:
+		_state.player.statuses.erase(status_id)
+	else:
+		_state.player.statuses[status_id] = remaining_status
+	if int(prepared.uses) <= 0:
+		_state.player.prepared_attacks.remove_at(index)
+	else:
+		_state.player.prepared_attacks[index] = prepared
+	_log.record("tagged_attack_consumed", {"tag": prepared.get("tag", ""), "multiplier": multiplier, "remaining_uses": maxi(int(prepared.uses), 0)})
+	return multiplier
+
+
+func _prepared_attack_index(card: Dictionary) -> int:
+	if not card.get("tags", []).has("attack"):
+		return -1
+	for index in _state.player.prepared_attacks.size():
+		if card.get("tags", []).has(_state.player.prepared_attacks[index].get("tag", "")):
+			return index
+	return -1
+
+
+func _trigger_retaliation() -> void:
+	if _state.player.retaliations.is_empty():
+		return
+	var reaction: Dictionary = _state.player.retaliations[0]
+	reaction.uses = int(reaction.get("uses", 1)) - 1
+	if int(reaction.uses) <= 0:
+		_state.player.retaliations.remove_at(0)
+	else:
+		_state.player.retaliations[0] = reaction
+	var remaining := maxi(int(_state.player.statuses.get("m3.counter_stance", 1)) - 1, 0)
+	if remaining == 0:
+		_state.player.statuses.erase("m3.counter_stance")
+	else:
+		_state.player.statuses["m3.counter_stance"] = remaining
+	_log.record("retaliation_triggered", {"base_power": reaction.get("base_power", 0.0), "remaining_uses": maxi(int(reaction.uses), 0)})
+	_apply_damage("player", "enemy", {"base_power": reaction.get("base_power", 0.0), "multiplier": 1.0})
+
+
+func _preview_pre_card_talent(card: Dictionary, source: Dictionary, target: Dictionary) -> void:
+	var talent: Dictionary = _state.get("player_talent", {})
+	if talent.is_empty() or not _talent_has_room(talent):
+		return
+	var trigger: Dictionary = talent.get("trigger", {})
+	var tags: Array = card.get("tags", [])
+	if trigger.get("type", "") != "FirstTaggedAttackCard" or not tags.has("attack") or not tags.has(trigger.get("tag", "")):
+		return
+	for effect in talent.get("effects", []):
+		if effect.get("type", "") == "ModifyDefense":
+			if effect.get("target", "opponent") == "self":
+				source.defense = maxf(float(source.defense) + float(effect.get("amount", 0)), 0.0)
+			else:
+				target.defense = maxf(float(target.defense) + float(effect.get("amount", 0)), 0.0)
+
+
+func _preview_effect_list(effects: Array, source: Dictionary, target: Dictionary, card_multiplier: float) -> int:
+	var total := 0
+	for effect in effects:
+		var effect_type: String = effect.get("type", "")
+		match effect_type:
+			"DealDamage":
+				total += _preview_troop_damage(_preview_damage_effect(effect, card_multiplier), source, target)
+			"RepeatAttack":
+				for index in maxi(int(effect.get("times", 1)), 0):
+					total += _preview_troop_damage(_preview_damage_effect(effect, card_multiplier), source, target)
+			"ModifyDefense":
+				if effect.get("target", "opponent") == "self":
+					source.defense = maxf(float(source.defense) + float(effect.get("amount", 0)), 0.0)
+				else:
+					target.defense = maxf(float(target.defense) + float(effect.get("amount", 0)), 0.0)
+			"GainArmor":
+				if effect.get("target", "self") == "self":
+					source.armor += maxi(int(effect.get("amount", 0)), 0)
+			"ModifyMorale":
+				if effect.get("target", "opponent") == "self":
+					source.morale = clampi(int(source.morale) + int(effect.get("amount", 0)), 0, int(source.max_morale))
+				else:
+					target.morale = clampi(int(target.morale) + int(effect.get("amount", 0)), 0, int(target.max_morale))
+			"ConditionalEffect":
+				var evaluated := ConditionEvaluatorScript.evaluate_all(effect.get("conditions", []), {"actor": source, "target": target, "turn_stats": _state.turn_stats})
+				if evaluated.passed:
+					total += _preview_effect_list(effect.get("effects", []), source, target, card_multiplier)
+			"DealDamageFromArmor":
+				var armor_effect: Dictionary = _armor_damage_effect(effect, source)
+				total += _preview_troop_damage(_preview_damage_effect(armor_effect, card_multiplier), source, target)
+				if bool(effect.get("clear_armor_after", false)):
+					source.armor = 0
+			"ConvertArmorToDamage":
+				var consume_ratio := clampf(float(effect.get("consume_ratio", 1.0)), 0.0, 1.0)
+				var consumed := mini(roundi(float(source.armor) * consume_ratio), int(source.armor))
+				var armor_effect: Dictionary = effect.duplicate(true)
+				armor_effect.base_power = float(consumed) * float(effect.get("ratio", 1.0))
+				source.armor -= consumed
+				total += _preview_troop_damage(_preview_damage_effect(armor_effect, card_multiplier), source, target)
+	return total
+
+
+func _preview_damage_effect(effect: Dictionary, card_multiplier: float) -> Dictionary:
+	var resolved := effect.duplicate(true)
+	resolved.multiplier = float(effect.get("multiplier", 1.0)) * card_multiplier
+	return resolved
+
+
+func _preview_troop_damage(effect: Dictionary, source: Dictionary, target: Dictionary) -> int:
+	var calculated := DamageCalculatorScript.preview(effect, source, target)
+	var absorbed := mini(int(target.armor), calculated)
+	target.armor -= absorbed
+	return calculated - absorbed
 
 
 func _validate_request(request: Dictionary, content_registry) -> PackedStringArray:
@@ -410,6 +658,16 @@ func _validate_request(request: Dictionary, content_registry) -> PackedStringArr
 	if request.has("enemy") and request.enemy is Dictionary:
 		if not request.enemy.get("skills", null) is Array or request.enemy.get("skills", []).is_empty():
 			errors.append("combat request enemy must have at least one skill")
+	if request.has("player") and request.player is Dictionary:
+		var player_id: String = request.player.get("id", "")
+		var talent_id: String = request.player.get("talent_id", "")
+		if talent_id.is_empty() and content_registry.has_general(player_id):
+			talent_id = content_registry.get_general(player_id).get("talent_id", "")
+		if not talent_id.is_empty():
+			if not content_registry.has_talent(talent_id):
+				errors.append("combat request references unknown talent '%s'" % talent_id)
+			elif content_registry.get_talent(talent_id).get("owner_general_id", "") != player_id:
+				errors.append("combat request talent '%s' does not belong to '%s'" % [talent_id, player_id])
 	return errors
 
 

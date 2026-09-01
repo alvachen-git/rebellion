@@ -8,10 +8,10 @@
   "copy_limit": 3,
   "exhaust": false,
   "conditions": [],
-  "effects": [{"type": "GainArmor", "amount": 30, "target": "self"}, {"type": "RetaliateOnDamage", "base_power": 55, "uses": 1, "target": "opponent"}],
+  "effects": [{"type": "GainArmor", "amount": 30, "target": "self"}, {"type": "RetaliateOnDamage", "base_power": 55, "uses": 1, "target": "self"}],
   "upgrade_branches": [
-    {"id": "sharp_formation", "name": "锐阵", "overrides": {"effects": [{"type": "GainArmor", "amount": 30, "target": "self"}, {"type": "RetaliateOnDamage", "base_power": 85, "uses": 1, "target": "opponent"}]}},
-    {"id": "hold_formation", "name": "持阵", "overrides": {"effects": [{"type": "GainArmor", "amount": 45, "target": "self"}, {"type": "RetaliateOnDamage", "base_power": 40, "uses": 2, "target": "opponent"}]}}
+    {"id": "sharp_formation", "name": "锐阵", "overrides": {"effects": [{"type": "GainArmor", "amount": 30, "target": "self"}, {"type": "RetaliateOnDamage", "base_power": 85, "uses": 1, "target": "self"}]}},
+    {"id": "hold_formation", "name": "持阵", "overrides": {"effects": [{"type": "GainArmor", "amount": 45, "target": "self"}, {"type": "RetaliateOnDamage", "base_power": 40, "uses": 2, "target": "self"}]}}
   ],
   "presentation": {"description": "获得护甲；下次受到敌军兵力攻击后立即反击。", "icon_id": "m3.defense.counter_stance"}
 }
