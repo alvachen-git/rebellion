@@ -57,10 +57,13 @@ func setup(
 		"general": player,
 		"deck": deck.duplicate(),
 		"unbanked_loot": {},
+		"lost_unbanked_loot": {},
 		"temporary_buffs": [],
 		"boss_modifiers": {},
 		"status": "active",
 		"completed_battles": 0,
+		"general_died": false,
+		"general_injured": false,
 	}
 	_pending_combat_request = {}
 	return PackedStringArray()
@@ -191,7 +194,69 @@ func apply_victory_result(result: Dictionary) -> Dictionary:
 	_pending_combat_request = {}
 	if _route.status() == "completed":
 		_state.status = "awaiting_settlement"
+		_state.temporary_buffs.clear()
 	return {"ok": true, "node_id": route_result.node_id, "reason": ""}
+
+
+func apply_terminal_combat_result(result: Dictionary) -> Dictionary:
+	if _pending_combat_request.is_empty():
+		return _failure("没有待结算战斗")
+	var result_status: String = result.get("status", "")
+	if not result_status in ["retreated", "defeat"]:
+		return _failure("终止结果必须是撤退或失败")
+	for field in ["player_remaining_troops", "player_remaining_morale", "general_died", "general_injured"]:
+		if not result.has(field):
+			return _failure("CombatResult 缺少字段：%s" % field)
+	var troops := int(result.player_remaining_troops)
+	var morale := int(result.player_remaining_morale)
+	if troops < 0 or troops > int(_state.general.max_troops):
+		return _failure("CombatResult 剩余兵力越界")
+	if morale < 0 or morale > int(_state.general.max_morale):
+		return _failure("CombatResult 剩余士气越界")
+	if result_status == "retreated":
+		if troops <= 0 or morale <= 0:
+			return _failure("主动撤退必须保留正数兵力和士气")
+		if bool(result.general_died) or bool(result.general_injured):
+			return _failure("主动撤退必须保证武将生还且不新增重伤")
+	_state.general.troops = troops
+	_state.general.morale = morale
+	_state.general.armor = 0
+	_state.general_died = bool(result.general_died)
+	_state.general_injured = bool(result.general_injured)
+	_state.lost_unbanked_loot = _state.unbanked_loot.duplicate(true)
+	_state.unbanked_loot = {}
+	_state.temporary_buffs.clear()
+	_pending_combat_request = {}
+	_state.status = "retreated" if result_status == "retreated" else "failed"
+	return {"ok": true, "status": _state.status, "reason": ""}
+
+
+func create_settlement_request() -> Dictionary:
+	var outcome_by_status := {
+		"awaiting_settlement": "success",
+		"retreated": "retreated",
+		"failed": "failed",
+	}
+	var run_status: String = _state.get("status", "")
+	if not outcome_by_status.has(run_status):
+		return _failure("远征尚未进入可结算状态")
+	var succeeded := run_status == "awaiting_settlement"
+	var request := {
+		"request_id": "settlement:%s" % _state.run_id,
+		"run_id": _state.run_id,
+		"expedition_id": _state.expedition_id,
+		"outcome": outcome_by_status[run_status],
+		"general_id": _state.general.id,
+		"remaining_troops": int(_state.general.troops),
+		"remaining_morale": int(_state.general.morale),
+		"general_died": bool(_state.general_died),
+		"general_injured": bool(_state.general_injured),
+		"loot_to_bank": _state.unbanked_loot.duplicate(true) if succeeded else {},
+		"lost_unbanked_loot": {} if succeeded else _state.lost_unbanked_loot.duplicate(true),
+		"boss_modifiers": _state.boss_modifiers.duplicate(true),
+		"completed_battles": int(_state.completed_battles),
+	}
+	return {"ok": true, "request": request, "reason": ""}
 
 
 func snapshot() -> Dictionary:
