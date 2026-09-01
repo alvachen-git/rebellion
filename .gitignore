@@ -1,4 +1,5 @@
 .DS_Store
+.godot/
 *.log
 *.tmp
 *.bak
@@ -8,4 +9,4 @@ build/
 dist/
 coverage/
 
-# 引擎专用忽略项在 D-001 确认后补充。
+# Godot generated import/cache state remains local.

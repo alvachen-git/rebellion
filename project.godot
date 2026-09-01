@@ -1,0 +1,44 @@
+; Engine configuration file.
+; Edit through the Godot editor when possible.
+
+config_version=5
+
+[application]
+
+config/name="架空王朝起义军"
+config/description="长期成长与节点远征结合的架空王朝卡牌策略游戏"
+run/main_scene="res://src/ui/bootstrap/bootstrap.tscn"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/handheld/orientation=1
+
+[input]
+
+end_turn={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":32,"unicode":32)]
+}
+retreat={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":82,"unicode":114)]
+}
+quick_save={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194338,"unicode":0)]
+}
+quick_load={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194339,"unicode":0)]
+}
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false

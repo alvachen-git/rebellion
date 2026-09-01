@@ -1,0 +1,30 @@
+{
+  "id": "dev.m0_validation_sample",
+  "name": "M0验证牌",
+  "development_only": true,
+  "rarity": "basic",
+  "cost": 1,
+  "tags": ["attack", "cavalry"],
+  "owner_scope": "public",
+  "copy_limit": 3,
+  "exhaust": false,
+  "conditions": [
+    {
+      "type": "ArmyRatioAtLeast",
+      "army_type": "cavalry",
+      "ratio": 0.2
+    }
+  ],
+  "effects": [
+    {
+      "type": "DealDamage",
+      "base_power": 10,
+      "target": "enemy"
+    }
+  ],
+  "upgrade_branches": [],
+  "presentation": {
+    "description": "开发阶段内容校验样例，不进入正式牌库。",
+    "icon_id": "dev.placeholder.attack"
+  }
+}

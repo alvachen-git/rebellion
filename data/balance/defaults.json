@@ -1,0 +1,16 @@
+{
+  "content_version": "0.1.0-m0",
+  "combat": {
+    "starting_action_points": 3,
+    "cards_drawn_per_turn": 5,
+    "morale_minimum": 0,
+    "morale_maximum": 100,
+    "standard_deck_size": 20
+  },
+  "display": {
+    "design_width": 1600,
+    "design_height": 900,
+    "minimum_test_width": 1280,
+    "minimum_test_height": 720
+  }
+}
