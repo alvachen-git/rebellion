@@ -28,6 +28,9 @@ static func create_empty(campaign_id: String, timestamp: String) -> Dictionary:
 			"card_upgrade_branches": {},
 			"territories": [],
 			"research": {},
+			"applied_settlement_ids": [],
+			"settlement_history": [],
+			"pending_long_term_effects": [],
 		},
 		"expedition": null,
 	}

@@ -1,0 +1,83 @@
+extends RefCounted
+class_name CampaignState
+
+const MAIN_RESOURCE_IDS := ["silver", "food", "recruits", "military_knowledge"]
+
+
+static func create(campaign_id: String) -> Dictionary:
+	return {
+		"campaign_id": campaign_id,
+		"cycle": 0,
+		"main_city_stage": "ruined_camp",
+		"resources": {
+			"silver": 0,
+			"food": 0,
+			"recruits": 0,
+			"military_knowledge": 0,
+		},
+		"special_resources": {},
+		"army_inventory": {},
+		"generals": [],
+		"unlocked_public_cards": [],
+		"card_upgrade_branches": {},
+		"territories": [],
+		"research": {},
+		"applied_settlement_ids": [],
+		"settlement_history": [],
+		"pending_long_term_effects": [],
+	}
+
+
+static func normalize(source: Dictionary) -> Dictionary:
+	var result := source.duplicate(true)
+	var defaults := create(String(source.get("campaign_id", "")))
+	for field in defaults:
+		if not result.has(field):
+			result[field] = defaults[field].duplicate(true) if defaults[field] is Array or defaults[field] is Dictionary else defaults[field]
+	if result.get("resources", null) is Dictionary:
+		for resource_id in MAIN_RESOURCE_IDS:
+			if not result.resources.has(resource_id):
+				result.resources[resource_id] = 0
+	return result
+
+
+static func validate(state: Dictionary, source: String = "campaign") -> PackedStringArray:
+	var errors := PackedStringArray()
+	for field in create("").keys():
+		if not state.has(field):
+			errors.append("%s: missing field '%s'" % [source, field])
+	if String(state.get("campaign_id", "")).strip_edges().is_empty():
+		errors.append("%s: campaign_id must be non-empty" % source)
+	if not _is_non_negative_whole_number(state.get("cycle", null)):
+		errors.append("%s: cycle must be non-negative" % source)
+	var resources = state.get("resources", null)
+	if not resources is Dictionary:
+		errors.append("%s: resources must be an object" % source)
+	else:
+		for resource_id in MAIN_RESOURCE_IDS:
+			if not resources.has(resource_id):
+				errors.append("%s: resources missing '%s'" % [source, resource_id])
+			elif not _is_non_negative_whole_number(resources[resource_id]):
+				errors.append("%s: resource '%s' cannot be negative" % [source, resource_id])
+	for field in ["special_resources", "army_inventory", "card_upgrade_branches", "research"]:
+		if not state.get(field, null) is Dictionary:
+			errors.append("%s: %s must be an object" % [source, field])
+	var special_resources = state.get("special_resources", null)
+	if special_resources is Dictionary:
+		for resource_id in special_resources:
+			if not resource_id is String or resource_id.strip_edges().is_empty():
+				errors.append("%s: special resource id must be a non-empty string" % source)
+			elif not _is_non_negative_whole_number(special_resources[resource_id]):
+				errors.append("%s: special resource '%s' cannot be negative" % [source, resource_id])
+	for field in ["generals", "unlocked_public_cards", "territories", "applied_settlement_ids", "settlement_history", "pending_long_term_effects"]:
+		if not state.get(field, null) is Array:
+			errors.append("%s: %s must be an array" % [source, field])
+	return errors
+
+
+static func _is_non_negative_whole_number(value: Variant) -> bool:
+	if value is int:
+		return value >= 0
+	if value is float:
+		return is_finite(value) and value >= 0.0 and value == floor(value)
+	return false
