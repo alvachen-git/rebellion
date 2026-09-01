@@ -71,6 +71,21 @@ func available_next_node_ids() -> Array[String]:
 	return result
 
 
+func current_node() -> Dictionary:
+	return _map.get("node_by_id", {}).get(_current_node_id, {}).duplicate(true)
+
+
+func reveal_node(node_id: String) -> Dictionary:
+	if not _map.get("node_by_id", {}).has(node_id):
+		return _failure("找不到要揭示的节点")
+	_revealed[node_id] = true
+	return {"ok": true, "node_id": node_id, "reason": ""}
+
+
+func status() -> String:
+	return _status
+
+
 func visible_nodes() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for source_node in _map.get("nodes", []):
