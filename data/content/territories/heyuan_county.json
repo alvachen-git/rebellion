@@ -1,0 +1,21 @@
+{
+  "id": "territory.heyuan_county",
+  "name": "河源县",
+  "balance_status": "prototype_temporary",
+  "source_expedition_id": "expedition.capture_heyuan_county",
+  "main_city_stage_on_capture": "rebel_camp",
+  "independent_city_management": false,
+  "cycle_income": {
+    "main_resources": {
+      "silver": 180,
+      "food": 260,
+      "recruits": 60
+    },
+    "special_resources": {
+      "resource.refined_iron": 8
+    }
+  },
+  "presentation": {
+    "description": "义军攻取的第一座县城，作为势力资产提供周期收入，不开放独立城市经营。"
+  }
+}

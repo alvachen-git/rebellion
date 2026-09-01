@@ -3,6 +3,7 @@ class_name ContentRegistry
 
 const DEFAULT_MANIFEST_PATH := "res://data/content/manifest.json"
 const ExpeditionDefinitionValidatorScript := preload("res://src/domain/expedition/expedition_definition_validator.gd")
+const TerritoryDefinitionValidatorScript := preload("res://src/domain/content/territory_definition_validator.gd")
 const REQUIRED_CARD_FIELDS := [
 	"id",
 	"name",
@@ -79,6 +80,7 @@ var _enemies: Dictionary = {}
 var _talents: Dictionary = {}
 var _generals: Dictionary = {}
 var _expeditions: Dictionary = {}
+var _territories: Dictionary = {}
 var _errors: PackedStringArray = []
 
 
@@ -88,6 +90,7 @@ func load_all(manifest_path: String = DEFAULT_MANIFEST_PATH) -> bool:
 	_talents.clear()
 	_generals.clear()
 	_expeditions.clear()
+	_territories.clear()
 	_errors.clear()
 	var manifest_result := _load_json_object(manifest_path)
 	if not manifest_result.ok:
@@ -143,6 +146,15 @@ func load_all(manifest_path: String = DEFAULT_MANIFEST_PATH) -> bool:
 			_errors.append("%s: expedition path must be a string" % manifest_path)
 			continue
 		_load_expedition(raw_path)
+	var territory_paths = manifest.get("territories", [])
+	if not territory_paths is Array:
+		_errors.append("%s: territories must be an array" % manifest_path)
+		return false
+	for raw_path in territory_paths:
+		if not raw_path is String:
+			_errors.append("%s: territory path must be a string" % manifest_path)
+			continue
+		_load_territory(raw_path)
 	_validate_content_references()
 
 	return _errors.is_empty()
@@ -404,6 +416,18 @@ func expedition_count() -> int:
 	return _expeditions.size()
 
 
+func has_territory(territory_id: String) -> bool:
+	return _territories.has(territory_id)
+
+
+func get_territory(territory_id: String) -> Dictionary:
+	return _territories.get(territory_id, {}).duplicate(true)
+
+
+func territory_count() -> int:
+	return _territories.size()
+
+
 func get_errors() -> PackedStringArray:
 	return _errors.duplicate()
 
@@ -496,6 +520,23 @@ func _load_expedition(path: String) -> void:
 	_expeditions[expedition_id] = expedition
 
 
+func _load_territory(path: String) -> void:
+	var result := _load_json_object(path)
+	if not result.ok:
+		_errors.append(result.error)
+		return
+	var territory: Dictionary = result.value
+	var validation_errors := TerritoryDefinitionValidatorScript.validate(territory, path)
+	if not validation_errors.is_empty():
+		_errors.append_array(validation_errors)
+		return
+	var territory_id: String = territory.id
+	if _territories.has(territory_id):
+		_errors.append("%s: duplicate territory id '%s'" % [path, territory_id])
+		return
+	_territories[territory_id] = territory
+
+
 func _validate_content_references() -> void:
 	for talent_id in _talents:
 		var talent: Dictionary = _talents[talent_id]
@@ -556,6 +597,10 @@ func _validate_content_references() -> void:
 			var enemy_id: String = node.get("enemy_id", "")
 			if not enemy_id.is_empty() and not _enemies.has(enemy_id):
 				_errors.append("expedition '%s' node '%s' references unknown enemy '%s'" % [expedition_id, node.get("id", ""), enemy_id])
+	for territory_id in _territories:
+		var source_expedition_id: String = _territories[territory_id].get("source_expedition_id", "")
+		if not _expeditions.has(source_expedition_id):
+			_errors.append("territory '%s' references unknown expedition '%s'" % [territory_id, source_expedition_id])
 	for card_id in _cards:
 		var owner_scope: String = _cards[card_id].get("owner_scope", "")
 		if owner_scope == "public":

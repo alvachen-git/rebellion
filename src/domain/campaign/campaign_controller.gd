@@ -5,6 +5,7 @@ const CampaignStateScript := preload("res://src/domain/campaign/campaign_state.g
 const ArmyManagementServiceScript := preload("res://src/domain/campaign/army_management_service.gd")
 const ResearchManagementServiceScript := preload("res://src/domain/campaign/research_management_service.gd")
 const GeneralManagementServiceScript := preload("res://src/domain/campaign/general_management_service.gd")
+const FactionCycleServiceScript := preload("res://src/domain/campaign/faction_cycle_service.gd")
 
 const RESOURCE_KEY_BY_LOOT_ID := {
 	"resource.silver": "silver",
@@ -19,6 +20,9 @@ var _research_economy: Dictionary = {}
 var _research_cards: Dictionary = {}
 var _general_progression: Dictionary = {}
 var _general_definitions: Dictionary = {}
+var _faction_cycle: Dictionary = {}
+var _territory_definitions: Dictionary = {}
+var _territory_by_expedition: Dictionary = {}
 
 
 func setup(campaign_source: Dictionary) -> PackedStringArray:
@@ -83,6 +87,7 @@ func apply_expedition_settlement(request: Dictionary) -> Dictionary:
 		"army_losses": army_losses.duplicate(true),
 		"army_losses_applied": request.has("initial_troops") and request.has("army_composition"),
 		"general_effect_applied": false,
+		"faction_effect_applied": false,
 	})
 	_state = next_state
 	return {"ok": true, "duplicate": false, "errors": PackedStringArray(), "resource_changes": resource_changes}
@@ -392,6 +397,123 @@ func general_availability(general_id: String) -> Dictionary:
 	return {"ok": true, "available": true, "reason": "available"}
 
 
+func configure_faction(cycle_definition: Dictionary, territory_definitions: Array) -> PackedStringArray:
+	_faction_cycle = {}
+	_territory_definitions = {}
+	_territory_by_expedition = {}
+	var errors := FactionCycleServiceScript.validate_catalog(cycle_definition, territory_definitions)
+	if not errors.is_empty():
+		return errors
+	_faction_cycle = cycle_definition.duplicate(true)
+	for definition in territory_definitions:
+		_territory_definitions[definition.id] = definition.duplicate(true)
+		_territory_by_expedition[definition.source_expedition_id] = definition.duplicate(true)
+	return errors
+
+
+func apply_pending_faction_effect(request_id: String) -> Dictionary:
+	if _state.is_empty():
+		return _faction_action_failure("campaign: controller is not initialized")
+	if _faction_cycle.is_empty() or _territory_definitions.is_empty():
+		return _faction_action_failure("campaign: faction catalog is not configured")
+	if _state.campaign_status != "active":
+		return _faction_action_failure("faction cycle: campaign is already game_over")
+	if request_id.strip_edges().is_empty():
+		return _faction_action_failure("faction effect: request_id must be a non-empty string")
+	if _state.faction.applied_effect_ids.has(request_id):
+		return _faction_action_duplicate()
+	var effect_index := _find_pending_effect_index(request_id)
+	if effect_index < 0:
+		return _faction_action_failure("faction effect: unknown settlement request '%s'" % request_id)
+	var effect: Dictionary = _state.pending_long_term_effects[effect_index]
+	var effect_error := _validate_pending_faction_effect(effect, request_id)
+	if not effect_error.is_empty():
+		return _faction_action_failure(effect_error)
+	if bool(effect.faction_effect_applied):
+		return _faction_action_duplicate()
+	var expedition_id: String = effect.expedition_id
+	var outcome: String = effect.outcome
+	var advances_cycle: bool = _faction_cycle.cycle_advancing_expedition_ids.has(expedition_id) and _faction_cycle.cycle_advancing_outcomes.has(outcome)
+	var next_state := _state.duplicate(true)
+	if not advances_cycle:
+		next_state.pending_long_term_effects[effect_index].faction_effect_applied = true
+		next_state.faction.applied_effect_ids.append(request_id)
+		next_state.faction.history.append({
+			"action_id": request_id,
+			"action": "skip_faction_cycle",
+			"expedition_id": expedition_id,
+			"outcome": outcome,
+			"reason": "outcome_not_configured" if _faction_cycle.cycle_advancing_expedition_ids.has(expedition_id) else "not_major_expedition",
+		})
+		_state = next_state
+		return {
+			"ok": true,
+			"duplicate": false,
+			"skipped": true,
+			"errors": PackedStringArray(),
+			"cycle_advanced": 0,
+			"captured_territory_ids": [],
+			"main_income": {},
+			"special_income": {},
+			"changed_general_ids": [],
+			"recovered_general_ids": [],
+		}
+	var target_cycle := int(next_state.cycle) + 1
+	var captured_territory_ids := []
+	if _territory_by_expedition.has(expedition_id):
+		var territory_definition: Dictionary = _territory_by_expedition[expedition_id]
+		if _find_territory_index_in_state(next_state, territory_definition.id) < 0:
+			next_state.territories.append(FactionCycleServiceScript.create_territory_instance(territory_definition, target_cycle, request_id))
+			next_state.main_city_stage = territory_definition.main_city_stage_on_capture
+			captured_territory_ids.append(territory_definition.id)
+	var income: Dictionary = FactionCycleServiceScript.calculate_cycle_income(
+		next_state.territories,
+		_territory_definitions,
+		target_cycle,
+		int(_faction_cycle.new_territory_income_delay_cycles)
+	)
+	if not income.ok:
+		return _faction_failure_from_errors(income.errors)
+	for resource_id in income.main_income:
+		next_state.resources[resource_id] = int(next_state.resources.get(resource_id, 0)) + int(income.main_income[resource_id])
+	for resource_id in income.special_income:
+		next_state.special_resources[resource_id] = int(next_state.special_resources.get(resource_id, 0)) + int(income.special_income[resource_id])
+	next_state.cycle = target_cycle
+	var recovery_action_id := "faction-recovery:%s" % request_id
+	var recovery: Dictionary = _advance_general_recovery_in_state(next_state, recovery_action_id)
+	next_state.pending_long_term_effects[effect_index].faction_effect_applied = true
+	next_state.faction.applied_effect_ids.append(request_id)
+	next_state.faction.history.append({
+		"action_id": request_id,
+		"action": "advance_faction_cycle",
+		"expedition_id": expedition_id,
+		"outcome": outcome,
+		"from_cycle": target_cycle - 1,
+		"to_cycle": target_cycle,
+		"captured_territory_ids": captured_territory_ids.duplicate(true),
+		"contributing_territory_ids": income.contributing_territory_ids.duplicate(true),
+		"main_income": income.main_income.duplicate(true),
+		"special_income": income.special_income.duplicate(true),
+		"recovery_action_id": recovery_action_id,
+	})
+	var state_errors: PackedStringArray = CampaignStateScript.validate(next_state)
+	if not state_errors.is_empty():
+		return _faction_failure_from_errors(state_errors)
+	_state = next_state
+	return {
+		"ok": true,
+		"duplicate": false,
+		"skipped": false,
+		"errors": PackedStringArray(),
+		"cycle_advanced": 1,
+		"captured_territory_ids": captured_territory_ids,
+		"main_income": income.main_income,
+		"special_income": income.special_income,
+		"changed_general_ids": recovery.changed_general_ids,
+		"recovered_general_ids": recovery.recovered_general_ids,
+	}
+
+
 func _validate_settlement(request: Dictionary) -> PackedStringArray:
 	var errors := PackedStringArray()
 	if _state.get("campaign_status", "active") != "active":
@@ -527,6 +649,13 @@ func _find_pending_effect_index(request_id: String) -> int:
 	return -1
 
 
+func _find_territory_index_in_state(state: Dictionary, territory_id: String) -> int:
+	for index in state.territories.size():
+		if state.territories[index] is Dictionary and state.territories[index].get("territory_id", "") == territory_id:
+			return index
+	return -1
+
+
 func _validate_pending_general_effect(effect: Dictionary, request_id: String) -> String:
 	for field in ["request_id", "general_id", "expedition_id", "outcome", "remaining_troops", "general_died", "general_injured", "general_effect_applied"]:
 		if not effect.has(field):
@@ -546,9 +675,57 @@ func _validate_pending_general_effect(effect: Dictionary, request_id: String) ->
 	return ""
 
 
+func _validate_pending_faction_effect(effect: Dictionary, request_id: String) -> String:
+	for field in ["request_id", "expedition_id", "outcome", "faction_effect_applied"]:
+		if not effect.has(field):
+			return "faction effect: missing field '%s'" % field
+	if effect.request_id != request_id:
+		return "faction effect: request id mismatch"
+	for field in ["request_id", "expedition_id"]:
+		if not effect[field] is String or effect[field].strip_edges().is_empty():
+			return "faction effect: %s must be a non-empty string" % field
+	if not effect.outcome in ["success", "retreated", "failed"]:
+		return "faction effect: unsupported outcome '%s'" % effect.outcome
+	if not effect.faction_effect_applied is bool:
+		return "faction effect: faction_effect_applied must be boolean"
+	return ""
+
+
+func _advance_general_recovery_in_state(state: Dictionary, action_id: String) -> Dictionary:
+	var changed_general_ids := []
+	var recovered_general_ids := []
+	for index in state.generals.size():
+		var recovery: Dictionary = GeneralManagementServiceScript.advance_recovery(state.generals[index])
+		if recovery.changed:
+			state.generals[index] = recovery.instance
+			changed_general_ids.append(recovery.instance.general_id)
+			if recovery.recovered:
+				recovered_general_ids.append(recovery.instance.general_id)
+	state.general_system.applied_recovery_ids.append(action_id)
+	state.general_system.history.append({
+		"action_id": action_id,
+		"action": "advance_injury_recovery",
+		"changed_general_ids": changed_general_ids.duplicate(true),
+		"recovered_general_ids": recovered_general_ids.duplicate(true),
+	})
+	return {"changed_general_ids": changed_general_ids, "recovered_general_ids": recovered_general_ids}
+
+
 func _general_action_failure(error: String) -> Dictionary:
 	return {"ok": false, "duplicate": false, "errors": PackedStringArray([error]), "general": {}}
 
 
 func _general_action_duplicate() -> Dictionary:
 	return {"ok": true, "duplicate": true, "errors": PackedStringArray(), "general": {}}
+
+
+func _faction_action_failure(error: String) -> Dictionary:
+	return {"ok": false, "duplicate": false, "skipped": false, "errors": PackedStringArray([error]), "cycle_advanced": 0, "captured_territory_ids": [], "main_income": {}, "special_income": {}}
+
+
+func _faction_failure_from_errors(errors: PackedStringArray) -> Dictionary:
+	return {"ok": false, "duplicate": false, "skipped": false, "errors": errors, "cycle_advanced": 0, "captured_territory_ids": [], "main_income": {}, "special_income": {}}
+
+
+func _faction_action_duplicate() -> Dictionary:
+	return {"ok": true, "duplicate": true, "skipped": false, "errors": PackedStringArray(), "cycle_advanced": 0, "captured_territory_ids": [], "main_income": {}, "special_income": {}}

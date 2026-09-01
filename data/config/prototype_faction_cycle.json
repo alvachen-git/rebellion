@@ -1,0 +1,8 @@
+{
+  "id": "config.prototype.faction_cycle.v1",
+  "balance_status": "prototype_temporary",
+  "cycle_advancing_outcomes": ["success"],
+  "cycle_advancing_expedition_ids": ["expedition.capture_heyuan_county"],
+  "new_territory_income_delay_cycles": 1,
+  "deferred_systems": ["recruitment_refresh", "world_stage_change"]
+}

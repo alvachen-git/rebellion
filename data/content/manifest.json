@@ -53,5 +53,8 @@
   ],
   "expeditions": [
     "res://data/content/expeditions/capture_heyuan_county.json"
+  ],
+  "territories": [
+    "res://data/content/territories/heyuan_county.json"
   ]
 }

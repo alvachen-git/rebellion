@@ -4,6 +4,7 @@ class_name CampaignState
 const ArmyManagementServiceScript := preload("res://src/domain/campaign/army_management_service.gd")
 const ResearchManagementServiceScript := preload("res://src/domain/campaign/research_management_service.gd")
 const GeneralManagementServiceScript := preload("res://src/domain/campaign/general_management_service.gd")
+const FactionCycleServiceScript := preload("res://src/domain/campaign/faction_cycle_service.gd")
 const MAIN_RESOURCE_IDS := ["silver", "food", "recruits", "military_knowledge"]
 
 
@@ -27,6 +28,7 @@ static func create(campaign_id: String) -> Dictionary:
 		"unlocked_public_cards": [],
 		"card_upgrade_branches": {},
 		"territories": [],
+		"faction": FactionCycleServiceScript.create_faction_state(),
 		"research": {"applied_action_ids": [], "history": []},
 		"applied_settlement_ids": [],
 		"settlement_history": [],
@@ -52,10 +54,14 @@ static func normalize(source: Dictionary) -> Dictionary:
 		result.research = ResearchManagementServiceScript.normalize_research_state(result.research)
 	if result.get("general_system", null) is Dictionary:
 		result.general_system = GeneralManagementServiceScript.normalize_system_state(result.general_system)
+	if result.get("faction", null) is Dictionary:
+		result.faction = FactionCycleServiceScript.normalize_faction_state(result.faction)
 	if result.get("pending_long_term_effects", null) is Array:
 		for effect in result.pending_long_term_effects:
 			if effect is Dictionary and not effect.has("general_effect_applied"):
 				effect.general_effect_applied = false
+			if effect is Dictionary and not effect.has("faction_effect_applied"):
+				effect.faction_effect_applied = false
 	return result
 
 
@@ -77,7 +83,7 @@ static func validate(state: Dictionary, source: String = "campaign") -> PackedSt
 				errors.append("%s: resources missing '%s'" % [source, resource_id])
 			elif not _is_non_negative_whole_number(resources[resource_id]):
 				errors.append("%s: resource '%s' cannot be negative" % [source, resource_id])
-	for field in ["special_resources", "army_inventory", "card_upgrade_branches", "research", "general_system"]:
+	for field in ["special_resources", "army_inventory", "card_upgrade_branches", "research", "general_system", "faction"]:
 		if not state.get(field, null) is Dictionary:
 			errors.append("%s: %s must be an object" % [source, field])
 	var special_resources = state.get("special_resources", null)
@@ -92,6 +98,10 @@ static func validate(state: Dictionary, source: String = "campaign") -> PackedSt
 	errors.append_array(ResearchManagementServiceScript.validate_card_progress(state.get("unlocked_public_cards", null), state.get("card_upgrade_branches", null), source))
 	errors.append_array(GeneralManagementServiceScript.validate_system_state(state.get("general_system", null), "%s.general_system" % source))
 	errors.append_array(GeneralManagementServiceScript.validate_roster(state.get("generals", null), "%s.generals" % source))
+	errors.append_array(FactionCycleServiceScript.validate_faction_state(state.get("faction", null), "%s.faction" % source))
+	errors.append_array(FactionCycleServiceScript.validate_territory_instances(state.get("territories", null), "%s.territories" % source))
+	if String(state.get("main_city_stage", "")).strip_edges().is_empty():
+		errors.append("%s: main_city_stage must be non-empty" % source)
 	if not state.get("campaign_status", "") in ["active", "game_over"]:
 		errors.append("%s: campaign_status must be active or game_over" % source)
 	if state.get("campaign_status", "") == "game_over" and not state.get("game_over_record", null) is Dictionary:
