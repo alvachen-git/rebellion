@@ -7,6 +7,7 @@ const DamageCalculatorScript := preload("res://src/domain/combat/damage_calculat
 const ConditionEvaluatorScript := preload("res://src/domain/combat/condition_evaluator.gd")
 const DeckStateScript := preload("res://src/domain/combat/deck_state.gd")
 const EnemyIntentPlannerScript := preload("res://src/domain/combat/enemy_intent_planner.gd")
+const BossModifierApplierScript := preload("res://src/domain/combat/boss_modifier_applier.gd")
 
 const DEFAULT_ACTION_POINTS := 3
 const DEFAULT_DRAW_COUNT := 5
@@ -46,6 +47,14 @@ func setup(request: Dictionary, content_registry) -> PackedStringArray:
 	if String(enemy_source.get("talent_id", "")).is_empty() and content_registry.has_enemy(enemy_source.get("id", "")):
 		enemy_source.talent_id = content_registry.get_enemy(enemy_source.id).get("talent_id", "")
 	var enemy_talent_id: String = enemy_source.get("talent_id", "")
+	var enemy_talent_source: Dictionary = content_registry.get_talent(enemy_talent_id) if not enemy_talent_id.is_empty() else {}
+	var modifier_result: Dictionary = BossModifierApplierScript.apply(
+		enemy_source,
+		enemy_talent_source,
+		request.get("boss_modifiers", {})
+	)
+	enemy_source = modifier_result.enemy
+	enemy_talent_source = modifier_result.talent
 	_state = {
 		"battle_id": request.get("battle_id", "development_battle"),
 		"seed": int(request.get("seed", 0)),
@@ -57,21 +66,26 @@ func setup(request: Dictionary, content_registry) -> PackedStringArray:
 		"player": _normalize_combatant(player_source),
 		"player_talent": content_registry.get_talent(player_talent_id) if not player_talent_id.is_empty() else {},
 		"enemy": _normalize_combatant(enemy_source),
-		"enemy_talent": content_registry.get_talent(enemy_talent_id) if not enemy_talent_id.is_empty() else {},
+		"enemy_talent": enemy_talent_source,
 		"enemy_initial_armor": maxi(int(enemy_source.get("armor", 0)), 0),
 		"enemy_initial_armor_active": int(enemy_source.get("armor", 0)) > 0,
 		"enemy_talent_battle_triggers": {},
 		"enemy_intent_suppression": {},
+		"enemy_forced_intents": [],
 		"enemy_skills": enemy_source.get("skills", []).duplicate(true),
 		"enemy_cooldowns": {},
 		"enemy_intent": {},
 		"turn_stats": _new_turn_stats(),
+		"boss_modifiers": modifier_result.applied,
+		"enemy_phase": 1,
 		"status": "active",
 	}
 	_result = {}
 	_active_player_card = {}
 	_active_card_damage_multiplier = 1.0
 	_log.record("battle_started", {"battle_id": _state.battle_id, "seed": _state.seed})
+	for modifier_id in _state.boss_modifiers:
+		_log.record("boss_modifier_applied", {"modifier_id": modifier_id})
 	_start_player_turn()
 	return PackedStringArray()
 
@@ -190,17 +204,22 @@ func _start_player_turn() -> void:
 	_state.turn_stats = _new_turn_stats()
 	_tick_enemy_cooldowns()
 	var drawn: Array = _deck.draw(_state.draw_count)
-	var excluded_intent_types := _active_enemy_intent_suppressions()
-	_state.enemy_intent = EnemyIntentPlannerScript.choose_intent(
-		_state.enemy_skills,
-		_public_combatant(_state.enemy),
-		_public_combatant(_state.player),
-		_state.turn_stats,
-		_state.enemy_cooldowns,
-		_ai_rng,
-		excluded_intent_types
-	)
-	_consume_enemy_intent_suppressions(excluded_intent_types)
+	var forced_intent := _take_next_enemy_forced_intent()
+	if not forced_intent.is_empty():
+		_state.enemy_intent = forced_intent
+		_log.record("enemy_forced_intent_revealed", {"skill_id": forced_intent.get("id", "")})
+	else:
+		var excluded_intent_types := _active_enemy_intent_suppressions()
+		_state.enemy_intent = EnemyIntentPlannerScript.choose_intent(
+			_state.enemy_skills,
+			_public_combatant(_state.enemy),
+			_public_combatant(_state.player),
+			_state.turn_stats,
+			_state.enemy_cooldowns,
+			_ai_rng,
+			excluded_intent_types
+		)
+		_consume_enemy_intent_suppressions(excluded_intent_types)
 	_state.phase = "player_action"
 	_log.record("player_turn_started", {"turn": _state.turn, "drawn": drawn})
 	_log.record("enemy_intent_revealed", {
@@ -320,6 +339,11 @@ func _resolve_effect(effect: Dictionary, source_side: String) -> void:
 			var before := int(target.troops)
 			target.troops = mini(before + maxi(int(effect.get("amount", 0)), 0), int(target.max_troops))
 			_log.record("troops_restored", {"side": target_side, "amount": int(target.troops) - before, "troops": target.troops})
+		"QueueForcedIntent":
+			if source_side == "enemy":
+				_queue_enemy_forced_intent(String(effect.get("skill_id", "")))
+			else:
+				_log.record("unsupported_effect_source", {"type": effect_type, "source": source_side})
 		_:
 			_log.record("unsupported_effect", {"type": effect_type})
 	_check_outcome()
@@ -329,6 +353,7 @@ func _apply_damage(source_side: String, target_side: String, effect: Dictionary)
 	var source: Dictionary = _state[source_side]
 	var target: Dictionary = _state[target_side]
 	var armor_before := int(target.armor)
+	var troops_before := int(target.troops)
 	var calculated := DamageCalculatorScript.preview(effect, source, target)
 	var absorbed := mini(int(target.armor), calculated)
 	target.armor -= absorbed
@@ -342,6 +367,8 @@ func _apply_damage(source_side: String, target_side: String, effect: Dictionary)
 		"troop_damage": troop_damage,
 		"remaining_troops": target.troops,
 	})
+	if source_side == "player" and target_side == "enemy" and int(target.troops) > 0:
+		_try_trigger_enemy_troop_threshold(troops_before)
 	if source_side == "player" and target_side == "enemy" and armor_before > 0 and int(target.armor) == 0:
 		_try_trigger_enemy_initial_armor_broken()
 	_check_outcome()
@@ -546,6 +573,64 @@ func _consume_enemy_intent_suppressions(intent_types: Array) -> void:
 			"intent_type": intent_type,
 			"remaining_selections": remaining,
 		})
+
+
+func _try_trigger_enemy_troop_threshold(troops_before: int) -> void:
+	var talent: Dictionary = _state.get("enemy_talent", {})
+	var trigger: Dictionary = talent.get("trigger", {})
+	if trigger.get("type", "") != "FirstTroopRatioBelow":
+		return
+	var max_troops := maxi(int(_state.enemy.max_troops), 1)
+	var threshold := float(trigger.get("ratio", 0.5))
+	var ratio_before := float(troops_before) / float(max_troops)
+	var ratio_after := float(_state.enemy.troops) / float(max_troops)
+	if ratio_before < threshold or ratio_after >= threshold:
+		return
+	var talent_id: String = talent.get("id", "")
+	var counts: Dictionary = _state.get("enemy_talent_battle_triggers", {})
+	if int(counts.get(talent_id, 0)) >= int(trigger.get("per_battle_limit", 1)):
+		return
+	counts[talent_id] = int(counts.get(talent_id, 0)) + 1
+	_state.enemy_phase = 2
+	_log.record("enemy_talent_triggered", {
+		"talent_id": talent_id,
+		"trigger": trigger.get("type", ""),
+		"ratio_before": ratio_before,
+		"ratio_after": ratio_after,
+	})
+	_log.record("enemy_phase_changed", {"phase": 2, "troops": _state.enemy.troops})
+	for effect in talent.get("effects", []):
+		_resolve_effect(effect, "enemy")
+		if not is_active():
+			break
+
+
+func _queue_enemy_forced_intent(skill_id: String) -> void:
+	if _find_enemy_skill(skill_id).is_empty():
+		_log.record("enemy_forced_intent_missing", {"skill_id": skill_id})
+		return
+	_state.enemy_forced_intents.append(skill_id)
+	_log.record("enemy_forced_intent_queued", {
+		"skill_id": skill_id,
+		"queue_size": _state.enemy_forced_intents.size(),
+	})
+
+
+func _take_next_enemy_forced_intent() -> Dictionary:
+	while not _state.enemy_forced_intents.is_empty():
+		var skill_id: String = _state.enemy_forced_intents.pop_front()
+		var skill := _find_enemy_skill(skill_id)
+		if not skill.is_empty():
+			return skill
+		_log.record("enemy_forced_intent_missing", {"skill_id": skill_id})
+	return {}
+
+
+func _find_enemy_skill(skill_id: String) -> Dictionary:
+	for skill in _state.enemy_skills:
+		if skill.get("id", "") == skill_id:
+			return skill.duplicate(true)
+	return {}
 
 
 func _try_trigger_pre_card_talent(card: Dictionary) -> void:
@@ -755,6 +840,7 @@ func _validate_request(request: Dictionary, content_registry) -> PackedStringArr
 	if request.has("enemy") and request.enemy is Dictionary:
 		if not request.enemy.get("skills", null) is Array or request.enemy.get("skills", []).is_empty():
 			errors.append("combat request enemy must have at least one skill")
+		errors.append_array(BossModifierApplierScript.validate(request.enemy, request.get("boss_modifiers", {})))
 		var enemy_id: String = request.enemy.get("id", "")
 		var enemy_talent_id: String = request.enemy.get("talent_id", "")
 		if enemy_talent_id.is_empty() and content_registry.has_enemy(enemy_id):

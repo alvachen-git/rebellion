@@ -23,6 +23,7 @@ func _run_all() -> void:
 	await _test_retreat_confirmation_result_state()
 	await _test_victory_and_restart_flow()
 	await _test_m3_playable_selection_rebuilds_battle()
+	await _test_boss_phase_trigger_is_explained_in_ui()
 	await _test_layout_at_target_resolutions()
 	print("TEST SUMMARY: %d passed, %d failed" % [_passed, _failed])
 	quit(0 if _failed == 0 else 1)
@@ -128,7 +129,7 @@ func _test_m3_playable_selection_rebuilds_battle() -> void:
 	var general_selector: OptionButton = screen.get_node("%GeneralSelector")
 	var enemy_selector: OptionButton = screen.get_node("%EnemySelector")
 	_assert_equal(general_selector.item_count, 3, "playable selector exposes the three approved Builds")
-	_assert_equal(enemy_selector.item_count, 7, "playable selector exposes five normal and two elite enemies")
+	_assert_equal(enemy_selector.item_count, 8, "playable selector exposes five normal, two elite, and one boss enemy")
 	general_selector.select(1)
 	general_selector.item_selected.emit(1)
 	enemy_selector.select(6)
@@ -144,6 +145,30 @@ func _test_m3_playable_selection_rebuilds_battle() -> void:
 	_assert_true("周靖" in screen.get_node("%PlayerName").text, "battlefield updates the selected general name")
 	_assert_true("贺巍" in screen.get_node("%EnemyName").text, "battlefield updates the selected enemy name")
 	_assert_equal(screen.card_button_count(), 5, "selected Build deals a five-card opening hand")
+	enemy_selector.select(7)
+	enemy_selector.item_selected.emit(7)
+	_assert_true("守城主将" in screen.get_node("%SelectionHint").text, "selection hint exposes Yan Cheng's boss identity")
+	screen.get_node("%StartSelectedButton").pressed.emit()
+	await process_frame
+	state = screen.combat_snapshot()
+	_assert_equal(state.enemy.id, "enemy.boss.yan_cheng", "battle selection can start against Yan Cheng")
+	_assert_equal(state.enemy.troops, 1750, "selected Yan Cheng battle carries full boss troops")
+	_assert_true("严成" in screen.get_node("%EnemyName").text, "battlefield updates the boss name")
+	await _destroy_screen(screen)
+
+
+func _test_boss_phase_trigger_is_explained_in_ui() -> void:
+	var request := _request(["card.public.general.assault", "card.public.general.assault"], 2410)
+	request.enemy = _registry.get_enemy("enemy.boss.yan_cheng")
+	request.enemy.troops = 928
+	var screen = await _create_screen(request)
+	var first_index: int = screen.combat_snapshot().deck.hand.find("card.public.general.assault")
+	screen.play_card_at(first_index)
+	var second_index: int = screen.combat_snapshot().deck.hand.find("card.public.general.assault")
+	screen.play_card_at(second_index)
+	_assert_equal(screen.combat_snapshot().enemy_phase, 2, "UI battle reaches Yan Cheng phase two through real card actions")
+	_assert_true("死守孤城" in screen.get_node("%FeedbackLabel").text, "UI names Yan Cheng's phase talent when it triggers")
+	_assert_true("锁定下一次特殊行动" in screen.get_node("%FeedbackLabel").text, "UI explains the forced action consequence")
 	await _destroy_screen(screen)
 
 

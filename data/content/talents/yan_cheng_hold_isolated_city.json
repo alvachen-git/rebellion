@@ -1,0 +1,11 @@
+{
+  "id": "talent.yan_cheng.hold_isolated_city",
+  "name": "死守孤城",
+  "owner_enemy_id": "enemy.boss.yan_cheng",
+  "trigger": {"type": "FirstTroopRatioBelow", "ratio": 0.5, "per_battle_limit": 1},
+  "effects": [
+    {"type": "GainArmor", "amount": 200, "target": "self"},
+    {"type": "QueueForcedIntent", "skill_id": "enemy.yan_cheng.hold_city"}
+  ],
+  "presentation": {"description": "兵力首次跌破50%时立即获得200护甲，并令下一次意图强制为固守城池。"}
+}

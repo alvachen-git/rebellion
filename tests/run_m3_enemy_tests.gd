@@ -44,7 +44,7 @@ func _run_all() -> void:
 
 
 func _test_enemy_content_contracts() -> void:
-	_assert_equal(_registry.enemy_count(), 8, "seven M3 enemies coexist with the development baseline")
+	_assert_equal(_registry.enemy_count(), 9, "seven M3 enemies and one boss coexist with the development baseline")
 	for enemy_id in PRODUCTION_ENEMIES:
 		_assert_true(_registry.has_enemy(enemy_id), "%s is registered" % enemy_id)
 		var enemy: Dictionary = _registry.get_enemy(enemy_id)

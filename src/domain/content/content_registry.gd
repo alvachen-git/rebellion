@@ -47,6 +47,7 @@ const ALLOWED_EFFECT_TYPES := {
 	"RestoreTroops": true,
 	"ScaleIncomingMorale": true,
 	"SuppressIntentTypeNextTurn": true,
+	"QueueForcedIntent": true,
 }
 const ALLOWED_CONDITION_TYPES := {
 	"ArmyRatioAtLeast": true,
@@ -67,9 +68,10 @@ const ALLOWED_TALENT_TRIGGER_TYPES := {
 	"FirstTaggedAttackCard": true,
 	"FirstMoraleLossEachPlayerTurn": true,
 	"InitialArmorBroken": true,
+	"FirstTroopRatioBelow": true,
 }
 const ALLOWED_ENEMY_TIERS := {"normal": true, "elite": true, "boss": true}
-const ALLOWED_INTENT_TYPES := {"attack": true, "defend": true, "disrupt": true, "recover": true}
+const ALLOWED_INTENT_TYPES := {"attack": true, "defend": true, "disrupt": true, "recover": true, "special": true}
 
 var _cards: Dictionary = {}
 var _enemies: Dictionary = {}
@@ -191,15 +193,19 @@ func validate_talent_definition(data: Dictionary, source: String = "<memory>") -
 	elif not ALLOWED_TALENT_TRIGGER_TYPES.has(trigger.get("type", "")):
 		errors.append("%s: unsupported talent trigger '%s'" % [source, trigger.get("type", "")])
 	else:
-		if trigger.type == "InitialArmorBroken":
+		if trigger.type in ["InitialArmorBroken", "FirstTroopRatioBelow"]:
 			if int(trigger.get("per_battle_limit", 0)) < 1:
-				errors.append("%s: InitialArmorBroken requires per_battle_limit of at least 1" % source)
+				errors.append("%s: %s requires per_battle_limit of at least 1" % [source, trigger.type])
 		elif int(trigger.get("per_turn_limit", 0)) < 1:
 			errors.append("%s: talent trigger requires per_turn_limit of at least 1" % source)
 		if trigger.type == "NthAttackCardPlayed" and int(trigger.get("count", 0)) < 1:
 			errors.append("%s: NthAttackCardPlayed requires a positive count" % source)
 		if trigger.type == "FirstTaggedAttackCard" and String(trigger.get("tag", "")).is_empty():
 			errors.append("%s: FirstTaggedAttackCard requires a tag" % source)
+		if trigger.type == "FirstTroopRatioBelow":
+			var ratio := float(trigger.get("ratio", 0.0))
+			if ratio <= 0.0 or ratio >= 1.0:
+				errors.append("%s: FirstTroopRatioBelow ratio must be between 0 and 1" % source)
 	var effects = data.get("effects", null)
 	if not effects is Array or effects.is_empty():
 		errors.append("%s: talent effects must be a non-empty array" % source)
@@ -249,7 +255,10 @@ func validate_enemy_definition(data: Dictionary, source: String = "<memory>") ->
 			skill_ids[skill_id] = true
 			if not ALLOWED_INTENT_TYPES.has(skill.get("intent_type", "")):
 				errors.append("%s: skill[%d] has unsupported intent_type '%s'" % [source, index, skill.get("intent_type", "")])
-			if int(skill.get("weight", 0)) < 1:
+			if bool(skill.get("queued_only", false)):
+				if int(skill.get("weight", -1)) != 0:
+					errors.append("%s: queued-only skill[%d] weight must be 0" % [source, index])
+			elif int(skill.get("weight", 0)) < 1:
 				errors.append("%s: skill[%d] weight must be at least 1" % [source, index])
 			if int(skill.get("cooldown", 0)) < 0:
 				errors.append("%s: skill[%d] cooldown cannot be negative" % [source, index])
@@ -283,6 +292,8 @@ func validate_enemy_definition(data: Dictionary, source: String = "<memory>") ->
 						errors.append("%s: production skill[%d] missing field '%s'" % [source, index, field])
 				if String(skills[index].get("name", "")).strip_edges().is_empty():
 					errors.append("%s: production skill[%d] requires a name" % [source, index])
+		if data.get("tier", "") == "boss":
+			_validate_boss_modifier_rules(data.get("boss_modifier_rules", null), source, errors)
 	return errors
 
 
@@ -456,12 +467,29 @@ func _validate_content_references() -> void:
 	for enemy_id in _enemies:
 		var enemy: Dictionary = _enemies[enemy_id]
 		var enemy_talent_id: String = enemy.get("talent_id", "")
-		if enemy_talent_id.is_empty():
-			continue
-		if not _talents.has(enemy_talent_id):
-			_errors.append("enemy '%s' references unknown talent '%s'" % [enemy_id, enemy_talent_id])
-		elif _talents[enemy_talent_id].get("owner_enemy_id", "") != enemy_id:
-			_errors.append("enemy '%s' talent owner does not match" % enemy_id)
+		if not enemy_talent_id.is_empty():
+			if not _talents.has(enemy_talent_id):
+				_errors.append("enemy '%s' references unknown talent '%s'" % [enemy_id, enemy_talent_id])
+			elif _talents[enemy_talent_id].get("owner_enemy_id", "") != enemy_id:
+				_errors.append("enemy '%s' talent owner does not match" % enemy_id)
+		var skill_ids := {}
+		for skill in enemy.get("skills", []):
+			skill_ids[skill.get("id", "")] = true
+		for skill in enemy.get("skills", []):
+			_validate_forced_intent_references(skill.get("effects", []), skill_ids, "enemy '%s' skill '%s'" % [enemy_id, skill.get("id", "")])
+		if _talents.has(enemy_talent_id):
+			_validate_forced_intent_references(_talents[enemy_talent_id].get("effects", []), skill_ids, "enemy '%s' talent '%s'" % [enemy_id, enemy_talent_id])
+		var modifier_rules = enemy.get("boss_modifier_rules", {})
+		if modifier_rules is Dictionary:
+			for rule in modifier_rules.values():
+				if not rule is Dictionary:
+					continue
+				for removed_id in rule.get("remove_skill_ids", []):
+					if not skill_ids.has(removed_id):
+						_errors.append("enemy '%s' modifier references unknown skill '%s'" % [enemy_id, removed_id])
+				for overridden_id in rule.get("armor_by_skill_id", {}).keys():
+					if not skill_ids.has(overridden_id):
+						_errors.append("enemy '%s' modifier references unknown skill '%s'" % [enemy_id, overridden_id])
 	for general_id in _generals:
 		var general: Dictionary = _generals[general_id]
 		var talent_id: String = general.get("talent_id", "")
@@ -491,6 +519,15 @@ func _validate_content_references() -> void:
 				_errors.append("card '%s' references unknown owner general '%s'" % [card_id, owner_id])
 		else:
 			_errors.append("card '%s' has invalid owner_scope '%s'" % [card_id, owner_scope])
+
+
+func _validate_forced_intent_references(effects: Array, skill_ids: Dictionary, source: String) -> void:
+	for effect in effects:
+		if effect.get("type", "") != "QueueForcedIntent":
+			continue
+		var queued_id: String = effect.get("skill_id", "")
+		if not skill_ids.has(queued_id):
+			_errors.append("%s queues unknown skill '%s'" % [source, queued_id])
 
 
 func _load_json_object(path: String) -> Dictionary:
@@ -547,6 +584,8 @@ func _validate_effect_entry(entry, source: String, kind: String, index: int, err
 			_require_effect_fields(entry, ["multiplier", "target"], source, kind, index, errors)
 		"SuppressIntentTypeNextTurn":
 			_require_effect_fields(entry, ["intent_type", "duration"], source, kind, index, errors)
+		"QueueForcedIntent":
+			_require_effect_fields(entry, ["skill_id"], source, kind, index, errors)
 		"ConditionalEffect":
 			var conditions = entry.get("conditions", null)
 			var nested_effects = entry.get("effects", null)
@@ -573,6 +612,33 @@ func _require_effect_fields(
 	for field in fields:
 		if not entry.has(field):
 			errors.append("%s: %s[%d] '%s' missing field '%s'" % [source, kind, index, entry.get("type", ""), field])
+
+
+func _validate_boss_modifier_rules(rules, source: String, errors: PackedStringArray) -> void:
+	if not rules is Dictionary:
+		errors.append("%s: boss requires boss_modifier_rules" % source)
+		return
+	for modifier_id in ["armory_destroyed", "beacon_destroyed", "granary_destroyed"]:
+		if not rules.get(modifier_id, null) is Dictionary:
+			errors.append("%s: boss modifier rule '%s' must be an object" % [source, modifier_id])
+	var armory = rules.get("armory_destroyed", {})
+	if armory is Dictionary:
+		for field in ["defense", "armor_by_skill_id", "talent_armor"]:
+			if not armory.has(field):
+				errors.append("%s: armory_destroyed missing field '%s'" % [source, field])
+		if not armory.get("armor_by_skill_id", null) is Dictionary:
+			errors.append("%s: armory_destroyed armor_by_skill_id must be an object" % source)
+	var beacon = rules.get("beacon_destroyed", {})
+	if beacon is Dictionary:
+		for field in ["morale", "remove_skill_ids"]:
+			if not beacon.has(field):
+				errors.append("%s: beacon_destroyed missing field '%s'" % [source, field])
+		if not beacon.get("remove_skill_ids", null) is Array:
+			errors.append("%s: beacon_destroyed remove_skill_ids must be an array" % source)
+	var granary = rules.get("granary_destroyed", {})
+	if granary is Dictionary:
+		if not granary.get("remove_skill_ids", null) is Array:
+			errors.append("%s: granary_destroyed remove_skill_ids must be an array" % source)
 
 
 func _validate_upgrade_branches(branches, source: String, errors: PackedStringArray) -> void:

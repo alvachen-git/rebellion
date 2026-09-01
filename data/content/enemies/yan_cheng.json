@@ -1,0 +1,37 @@
+{
+  "id": "enemy.boss.yan_cheng",
+  "name": "严成",
+  "tier": "boss",
+  "talent_id": "talent.yan_cheng.hold_isolated_city",
+  "troops": 1750,
+  "max_troops": 1750,
+  "morale": 75,
+  "max_morale": 100,
+  "attack": 30,
+  "defense": 42,
+  "army_composition": {"infantry": 0.75, "archer": 0.25, "cavalry": 0.0},
+  "skills": [
+    {"id": "enemy.yan_cheng.garrison_volley", "name": "守军齐射", "intent_type": "attack", "weight": 4, "cooldown": 0, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 72, "target": "opponent"}]},
+    {"id": "enemy.yan_cheng.fortify", "name": "坚城固守", "intent_type": "defend", "weight": 3, "cooldown": 0, "conditions": [], "effects": [{"type": "GainArmor", "amount": 110, "target": "self"}]},
+    {"id": "enemy.yan_cheng.suppress_morale", "name": "镇压军心", "intent_type": "disrupt", "weight": 2, "cooldown": 1, "conditions": [], "effects": [{"type": "ModifyMorale", "amount": -12, "target": "opponent"}]},
+    {"id": "enemy.yan_cheng.reorganize", "name": "据城整军", "intent_type": "recover", "weight": 2, "cooldown": 2, "conditions": [{"type": "OwnTroopRatioAtMost", "ratio": 0.7}], "effects": [{"type": "RestoreTroops", "amount": 120, "target": "self"}, {"type": "ModifyMorale", "amount": 10, "target": "self"}]},
+    {"id": "enemy.yan_cheng.signal_reinforcements", "name": "求援烽火", "intent_type": "special", "weight": 1, "cooldown": 3, "conditions": [], "effects": [{"type": "QueueForcedIntent", "skill_id": "enemy.yan_cheng.reinforcement_pincer"}]},
+    {"id": "enemy.yan_cheng.reinforcement_pincer", "name": "援军夹击", "intent_type": "special", "weight": 0, "queued_only": true, "cooldown": 0, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 120, "target": "opponent"}, {"type": "ModifyMorale", "amount": -10, "target": "opponent"}]},
+    {"id": "enemy.yan_cheng.hold_city", "name": "固守城池", "intent_type": "special", "weight": 0, "queued_only": true, "cooldown": 0, "conditions": [], "effects": [{"type": "GainArmor", "amount": 200, "target": "self"}]}
+  ],
+  "boss_modifier_rules": {
+    "armory_destroyed": {
+      "defense": 30,
+      "armor_by_skill_id": {"enemy.yan_cheng.fortify": 75, "enemy.yan_cheng.hold_city": 140},
+      "talent_armor": 140
+    },
+    "beacon_destroyed": {
+      "morale": 55,
+      "remove_skill_ids": ["enemy.yan_cheng.signal_reinforcements", "enemy.yan_cheng.reinforcement_pincer"]
+    },
+    "granary_destroyed": {
+      "remove_skill_ids": ["enemy.yan_cheng.reorganize"]
+    }
+  },
+  "presentation": {"description": "据守河源县的守城主将，会在兵力跌破一半时发动死守，并可呼唤援军夹击。"}
+}

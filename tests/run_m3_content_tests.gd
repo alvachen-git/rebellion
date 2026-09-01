@@ -48,7 +48,7 @@ func _run_all() -> void:
 	_registry = ContentRegistryScript.new()
 	_assert_true(_registry.load_all(), "M3 content registry loads without contract errors")
 	_assert_equal(_registry.general_count(), 3, "exactly three Vertical Slice generals are registered")
-	_assert_equal(_registry.talent_count(), 5, "three general and two elite enemy talents are registered")
+	_assert_equal(_registry.talent_count(), 6, "three general, two elite, and one boss talent are registered")
 	_assert_equal(M3_CARD_EFFECT_TYPES.size(), 19, "M3 contract enumerates exactly nineteen cards")
 	_test_card_contracts()
 	_test_general_contracts()

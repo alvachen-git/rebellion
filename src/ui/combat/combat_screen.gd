@@ -21,6 +21,7 @@ const ENEMY_IDS := [
 	"enemy.normal.overseer_unit",
 	"enemy.elite.gao_wu",
 	"enemy.elite.he_wei",
+	"enemy.boss.yan_cheng",
 ]
 const GENERAL_PREVIEW_SEEDS := {
 	"general.zhao_lie": 15,
@@ -91,6 +92,7 @@ func setup_battle(request: Dictionary = {}) -> bool:
 func play_card_at(hand_index: int) -> Dictionary:
 	if _controller == null:
 		return {"ok": false, "reason": "战斗尚未初始化"}
+	var before: Dictionary = _controller.snapshot()
 	var availability = _controller.card_availability(hand_index)
 	if not availability.ok:
 		feedback_label.text = availability.reason
@@ -100,7 +102,14 @@ func play_card_at(hand_index: int) -> Dictionary:
 	var card: Dictionary = _registry.get_card(card_id)
 	var result = _controller.play_card(hand_index)
 	if result.ok:
-		feedback_label.text = "已打出【%s】" % card.get("name", card_id)
+		var after: Dictionary = _controller.snapshot()
+		if int(after.get("enemy_phase", 1)) > int(before.get("enemy_phase", 1)):
+			feedback_label.text = "%s发动【%s】：立即加固城防，并锁定下一次特殊行动。" % [
+				after.enemy.get("name", "敌军"),
+				after.get("enemy_talent", {}).get("name", "阶段天赋"),
+			]
+		else:
+			feedback_label.text = "已打出【%s】" % card.get("name", card_id)
 		_pulse_feedback(BRONZE)
 	_refresh()
 	return result
@@ -262,6 +271,8 @@ func _pulse_feedback(color: Color) -> void:
 func _enemy_resolution_text(intent: Dictionary, before: Dictionary, after: Dictionary) -> String:
 	var action_names := {"attack": "强攻", "defend": "固守", "disrupt": "扰乱", "recover": "整军"}
 	var action_name: String = action_names.get(intent.get("intent_type", "special"), "特殊行动")
+	if intent.get("intent_type", "") == "special":
+		action_name = intent.get("name", action_name)
 	var troop_loss := maxi(int(before.player.troops) - int(after.player.troops), 0)
 	var morale_loss := maxi(int(before.player.morale) - int(after.player.morale), 0)
 	var outcomes: Array[String] = []
@@ -345,7 +356,8 @@ func _format_intent(intent: Dictionary) -> String:
 	for effect in intent.get("effects", []):
 		if effect.get("type", "") == "DealDamage":
 			damage += int(effect.get("base_power", 0))
-	return "%s%s" % [labels.get(kind, "※ 特殊"), " · 威力%d" % damage if damage > 0 else ""]
+	var label: String = labels.get(kind, "※ %s" % intent.get("name", "特殊"))
+	return "%s%s" % [label, " · 威力%d" % damage if damage > 0 else ""]
 
 
 func _format_card(card: Dictionary, preview_damage: int) -> String:
@@ -387,7 +399,8 @@ func _populate_selection_controls() -> void:
 	enemy_selector.clear()
 	for enemy_id in ENEMY_IDS:
 		var enemy: Dictionary = _registry.get_enemy(enemy_id)
-		var tier_name := "精英" if enemy.get("tier", "normal") == "elite" else "普通"
+		var tier_names := {"normal": "普通", "elite": "精英", "boss": "首领"}
+		var tier_name: String = tier_names.get(enemy.get("tier", "normal"), "普通")
 		enemy_selector.add_item("%s · %s" % [tier_name, enemy.name])
 		enemy_selector.set_item_metadata(enemy_selector.item_count - 1, enemy_id)
 	_select_metadata(general_selector, combat_snapshot().get("player", {}).get("id", GENERAL_IDS[0]))

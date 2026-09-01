@@ -19,6 +19,8 @@ static func choose_intent(
 		if not raw_skill is Dictionary:
 			continue
 		var skill: Dictionary = raw_skill
+		if bool(skill.get("queued_only", false)):
+			continue
 		if excluded_intent_types.has(skill.get("intent_type", "")):
 			continue
 		var skill_id: String = skill.get("id", "")
