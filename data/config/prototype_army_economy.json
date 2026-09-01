@@ -1,0 +1,22 @@
+{
+  "id": "army_economy.vertical_slice",
+  "balance_status": "prototype_temporary",
+  "batch_size": 100,
+  "army_types": {
+    "infantry": {
+      "name": "步兵",
+      "main_costs": {"recruits": 100, "silver": 10, "food": 10},
+      "special_costs": {}
+    },
+    "archer": {
+      "name": "弓兵",
+      "main_costs": {"recruits": 100, "silver": 20, "food": 10},
+      "special_costs": {}
+    },
+    "cavalry": {
+      "name": "骑兵",
+      "main_costs": {"recruits": 100, "silver": 40, "food": 20},
+      "special_costs": {"resource.warhorse": 100}
+    }
+  }
+}

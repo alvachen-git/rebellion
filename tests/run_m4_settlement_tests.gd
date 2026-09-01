@@ -50,6 +50,8 @@ func _test_success_settlement_request() -> void:
 	_assert_equal(first.request.loot_to_bank, {"resource.silver": 180, "resource.food": 260}, "success request is the only path that carries loot to bank")
 	_assert_true(first.request.lost_unbanked_loot.is_empty(), "success request reports no lost loot")
 	_assert_equal(first.request.remaining_troops, 500, "success request carries final troop state")
+	_assert_equal(first.request.initial_troops, 1050, "settlement preserves expedition starting troops for Campaign casualties")
+	_assert_equal(first.request.army_composition, {"infantry": 0.2, "archer": 0.1, "cavalry": 0.7}, "settlement preserves locked starting composition for Campaign casualties")
 	_assert_equal(first.request.remaining_morale, 48, "success request carries final morale state")
 	_assert_equal(first.request.boss_modifiers, {"armory_destroyed": true}, "success request preserves the completed strategic objective for audit")
 	_assert_true(not state.has("campaign"), "success boundary still does not contain Campaign state")

@@ -22,7 +22,7 @@ static func create_empty(campaign_id: String, timestamp: String) -> Dictionary:
 				"military_knowledge": 0,
 			},
 			"special_resources": {},
-			"army_inventory": {},
+			"army_inventory": {"infantry": 0, "archer": 0, "cavalry": 0},
 			"generals": [],
 			"unlocked_public_cards": [],
 			"card_upgrade_branches": {},
@@ -31,6 +31,8 @@ static func create_empty(campaign_id: String, timestamp: String) -> Dictionary:
 			"applied_settlement_ids": [],
 			"settlement_history": [],
 			"pending_long_term_effects": [],
+			"applied_army_action_ids": [],
+			"army_history": [],
 		},
 		"expedition": null,
 	}

@@ -1,6 +1,7 @@
 extends RefCounted
 class_name CampaignState
 
+const ArmyManagementServiceScript := preload("res://src/domain/campaign/army_management_service.gd")
 const MAIN_RESOURCE_IDS := ["silver", "food", "recruits", "military_knowledge"]
 
 
@@ -16,7 +17,7 @@ static func create(campaign_id: String) -> Dictionary:
 			"military_knowledge": 0,
 		},
 		"special_resources": {},
-		"army_inventory": {},
+		"army_inventory": {"infantry": 0, "archer": 0, "cavalry": 0},
 		"generals": [],
 		"unlocked_public_cards": [],
 		"card_upgrade_branches": {},
@@ -25,6 +26,8 @@ static func create(campaign_id: String) -> Dictionary:
 		"applied_settlement_ids": [],
 		"settlement_history": [],
 		"pending_long_term_effects": [],
+		"applied_army_action_ids": [],
+		"army_history": [],
 	}
 
 
@@ -38,6 +41,8 @@ static func normalize(source: Dictionary) -> Dictionary:
 		for resource_id in MAIN_RESOURCE_IDS:
 			if not result.resources.has(resource_id):
 				result.resources[resource_id] = 0
+	if result.get("army_inventory", null) is Dictionary:
+		result.army_inventory = ArmyManagementServiceScript.normalize_inventory(result.army_inventory)
 	return result
 
 
@@ -69,7 +74,8 @@ static func validate(state: Dictionary, source: String = "campaign") -> PackedSt
 				errors.append("%s: special resource id must be a non-empty string" % source)
 			elif not _is_non_negative_whole_number(special_resources[resource_id]):
 				errors.append("%s: special resource '%s' cannot be negative" % [source, resource_id])
-	for field in ["generals", "unlocked_public_cards", "territories", "applied_settlement_ids", "settlement_history", "pending_long_term_effects"]:
+	errors.append_array(ArmyManagementServiceScript.validate_inventory(state.get("army_inventory", null), "%s.army_inventory" % source))
+	for field in ["generals", "unlocked_public_cards", "territories", "applied_settlement_ids", "settlement_history", "pending_long_term_effects", "applied_army_action_ids", "army_history"]:
 		if not state.get(field, null) is Array:
 			errors.append("%s: %s must be an array" % [source, field])
 	return errors
