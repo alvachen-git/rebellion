@@ -1,0 +1,28 @@
+{
+  "id": "config.prototype.general_progression.v1",
+  "balance_status": "prototype_temporary",
+  "max_level": 6,
+  "max_levels_per_expedition": 1,
+  "experience_thresholds": {
+    "2": 100,
+    "3": 250,
+    "4": 450,
+    "5": 700,
+    "6": 1000
+  },
+  "experience_by_outcome": {
+    "success": 100,
+    "retreated": 25,
+    "failed": 10
+  },
+  "major_injury_recovery_cycles": 2,
+  "attribute_growth": {
+    "2": {"martial": 1, "leadership": 1, "administration": 1},
+    "5": {"martial": 1, "leadership": 1, "administration": 1}
+  },
+  "milestone_types": {
+    "3": "talent_branch_choice",
+    "4": "exclusive_card_unlock",
+    "6": "talent_branch_choice"
+  }
+}
