@@ -1,0 +1,57 @@
+{
+  "id": "expedition.capture_heyuan_county",
+  "name": "攻取河源县",
+  "node_count_min": 12,
+  "node_count_max": 16,
+  "entry_node_id": "heyuan.start",
+  "boss_node_id": "heyuan.county_seat",
+  "nodes": [
+    {"id": "heyuan.start", "name": "义军营地", "column": 0, "route": "shared", "node_type": "start", "fogged": false, "always_revealed": true, "presentation": {"description": "整军出发，选择前段战略路线。"}},
+
+    {"id": "heyuan.official.approach", "name": "官道前哨", "column": 1, "route": "official_road", "node_type_options": ["normal_combat", "normal_combat", "event"], "fogged": true, "presentation": {"description": "官道沿线守军密集。"}},
+    {"id": "heyuan.official.checkpoint", "name": "官道关卡", "column": 2, "route": "official_road", "node_type_options": ["normal_combat", "normal_combat", "loot"], "fogged": true, "presentation": {"description": "突破关卡后可直取军械库。"}},
+    {"id": "heyuan.official.armory", "name": "军械库", "column": 3, "route": "official_road", "node_type": "military_objective", "fogged": false, "always_revealed": true, "objective_id": "armory_destroyed", "presentation": {"description": "破坏军械库可削弱严成的防御与护甲。"}},
+
+    {"id": "heyuan.village.approach", "name": "村野小径", "column": 1, "route": "village_path", "node_type_options": ["event", "normal_combat", "event"], "fogged": true, "presentation": {"description": "借助乡民与隐蔽道路接近烽火台。"}},
+    {"id": "heyuan.village.contact", "name": "乡民联络", "column": 2, "route": "village_path", "node_type_options": ["event", "intel", "normal_combat"], "fogged": true, "presentation": {"description": "消息与风险都藏在村野之间。"}},
+    {"id": "heyuan.village.beacon", "name": "烽火台", "column": 3, "route": "village_path", "node_type": "military_objective", "fogged": false, "always_revealed": true, "objective_id": "beacon_destroyed", "presentation": {"description": "摧毁烽火台可削弱严成士气并阻断援军。"}},
+
+    {"id": "heyuan.grain.approach", "name": "粮道入口", "column": 1, "route": "grain_route", "node_type_options": ["normal_combat", "supply", "normal_combat"], "fogged": true, "presentation": {"description": "沿粮道推进，可补给也可能遭遇押粮军。"}},
+    {"id": "heyuan.grain.cache", "name": "转运粮垛", "column": 2, "route": "grain_route", "node_type_options": ["loot", "normal_combat", "supply"], "fogged": true, "presentation": {"description": "转运点兼具收益和消耗风险。"}},
+    {"id": "heyuan.grain.granary", "name": "县城粮仓", "column": 3, "route": "grain_route", "node_type": "military_objective", "fogged": false, "always_revealed": true, "objective_id": "granary_destroyed", "presentation": {"description": "烧毁粮仓可移除严成的整军恢复。"}},
+
+    {"id": "heyuan.merge.elite", "name": "县郊都尉营", "column": 4, "route": "shared", "node_type": "elite_combat", "fogged": true, "presentation": {"description": "三路在县郊汇合，必须突破精英守军。"}},
+    {"id": "heyuan.late.intel", "name": "城防情报", "column": 5, "route": "intel_route", "node_type": "intel", "fogged": true, "presentation": {"description": "揭示严成的属性、天赋与关键技能。"}},
+    {"id": "heyuan.late.supply", "name": "战前补给", "column": 5, "route": "supply_route", "node_type": "supply", "fogged": true, "presentation": {"description": "在决战前恢复兵力或士气。"}},
+    {"id": "heyuan.late.wealth", "name": "县郊府库", "column": 5, "route": "wealth_route", "node_type": "wealth_risk", "fogged": true, "presentation": {"description": "获取高额战利品，但承担额外战斗风险。"}},
+    {"id": "heyuan.county_seat", "name": "河源县城", "column": 6, "route": "shared", "node_type": "boss", "fogged": false, "always_revealed": true, "enemy_id": "enemy.boss.yan_cheng", "presentation": {"description": "击败守将严成，完成远征目标。"}}
+  ],
+  "edges": [
+    {"from": "heyuan.start", "to": "heyuan.official.approach"},
+    {"from": "heyuan.start", "to": "heyuan.village.approach"},
+    {"from": "heyuan.start", "to": "heyuan.grain.approach"},
+    {"from": "heyuan.official.approach", "to": "heyuan.official.checkpoint"},
+    {"from": "heyuan.official.checkpoint", "to": "heyuan.official.armory"},
+    {"from": "heyuan.village.approach", "to": "heyuan.village.contact"},
+    {"from": "heyuan.village.contact", "to": "heyuan.village.beacon"},
+    {"from": "heyuan.grain.approach", "to": "heyuan.grain.cache"},
+    {"from": "heyuan.grain.cache", "to": "heyuan.grain.granary"},
+    {"from": "heyuan.official.armory", "to": "heyuan.merge.elite"},
+    {"from": "heyuan.village.beacon", "to": "heyuan.merge.elite"},
+    {"from": "heyuan.grain.granary", "to": "heyuan.merge.elite"},
+    {"from": "heyuan.merge.elite", "to": "heyuan.late.intel"},
+    {"from": "heyuan.merge.elite", "to": "heyuan.late.supply"},
+    {"from": "heyuan.merge.elite", "to": "heyuan.late.wealth"},
+    {"from": "heyuan.late.intel", "to": "heyuan.county_seat"},
+    {"from": "heyuan.late.supply", "to": "heyuan.county_seat"},
+    {"from": "heyuan.late.wealth", "to": "heyuan.county_seat"}
+  ],
+  "strategic_objectives": {
+    "official_road": {"node_id": "heyuan.official.armory", "boss_modifier_id": "armory_destroyed"},
+    "village_path": {"node_id": "heyuan.village.beacon", "boss_modifier_id": "beacon_destroyed"},
+    "grain_route": {"node_id": "heyuan.grain.granary", "boss_modifier_id": "granary_destroyed"}
+  },
+  "presentation": {
+    "description": "从三条战略路线中选择一路，突破县郊守军后在情报、补给与财富之间作出决战前选择。"
+  }
+}

@@ -2,6 +2,7 @@ extends RefCounted
 class_name ContentRegistry
 
 const DEFAULT_MANIFEST_PATH := "res://data/content/manifest.json"
+const ExpeditionDefinitionValidatorScript := preload("res://src/domain/expedition/expedition_definition_validator.gd")
 const REQUIRED_CARD_FIELDS := [
 	"id",
 	"name",
@@ -77,6 +78,7 @@ var _cards: Dictionary = {}
 var _enemies: Dictionary = {}
 var _talents: Dictionary = {}
 var _generals: Dictionary = {}
+var _expeditions: Dictionary = {}
 var _errors: PackedStringArray = []
 
 
@@ -85,6 +87,7 @@ func load_all(manifest_path: String = DEFAULT_MANIFEST_PATH) -> bool:
 	_enemies.clear()
 	_talents.clear()
 	_generals.clear()
+	_expeditions.clear()
 	_errors.clear()
 	var manifest_result := _load_json_object(manifest_path)
 	if not manifest_result.ok:
@@ -131,6 +134,15 @@ func load_all(manifest_path: String = DEFAULT_MANIFEST_PATH) -> bool:
 			_errors.append("%s: general path must be a string" % manifest_path)
 			continue
 		_load_general(raw_path)
+	var expedition_paths = manifest.get("expeditions", [])
+	if not expedition_paths is Array:
+		_errors.append("%s: expeditions must be an array" % manifest_path)
+		return false
+	for raw_path in expedition_paths:
+		if not raw_path is String:
+			_errors.append("%s: expedition path must be a string" % manifest_path)
+			continue
+		_load_expedition(raw_path)
 	_validate_content_references()
 
 	return _errors.is_empty()
@@ -380,6 +392,18 @@ func general_count() -> int:
 	return _generals.size()
 
 
+func has_expedition(expedition_id: String) -> bool:
+	return _expeditions.has(expedition_id)
+
+
+func get_expedition(expedition_id: String) -> Dictionary:
+	return _expeditions.get(expedition_id, {}).duplicate(true)
+
+
+func expedition_count() -> int:
+	return _expeditions.size()
+
+
 func get_errors() -> PackedStringArray:
 	return _errors.duplicate()
 
@@ -455,6 +479,23 @@ func _load_general(path: String) -> void:
 	_generals[general_id] = general
 
 
+func _load_expedition(path: String) -> void:
+	var result := _load_json_object(path)
+	if not result.ok:
+		_errors.append(result.error)
+		return
+	var expedition: Dictionary = result.value
+	var validation_errors := ExpeditionDefinitionValidatorScript.validate(expedition, path)
+	if not validation_errors.is_empty():
+		_errors.append_array(validation_errors)
+		return
+	var expedition_id: String = expedition.id
+	if _expeditions.has(expedition_id):
+		_errors.append("%s: duplicate expedition id '%s'" % [path, expedition_id])
+		return
+	_expeditions[expedition_id] = expedition
+
+
 func _validate_content_references() -> void:
 	for talent_id in _talents:
 		var talent: Dictionary = _talents[talent_id]
@@ -509,6 +550,12 @@ func _validate_content_references() -> void:
 		for card_id in copies:
 			if int(copies[card_id]) > int(_cards[card_id].get("copy_limit", 1)):
 				_errors.append("general '%s' exceeds copy limit for '%s'" % [general_id, card_id])
+	for expedition_id in _expeditions:
+		var expedition: Dictionary = _expeditions[expedition_id]
+		for node in expedition.get("nodes", []):
+			var enemy_id: String = node.get("enemy_id", "")
+			if not enemy_id.is_empty() and not _enemies.has(enemy_id):
+				_errors.append("expedition '%s' node '%s' references unknown enemy '%s'" % [expedition_id, node.get("id", ""), enemy_id])
 	for card_id in _cards:
 		var owner_scope: String = _cards[card_id].get("owner_scope", "")
 		if owner_scope == "public":

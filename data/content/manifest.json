@@ -1,5 +1,5 @@
 {
-  "content_version": "0.4.0-m3-boss",
+  "content_version": "0.4.0-m4-map",
   "cards": [
     "res://data/content/cards/m0_validation_sample.json",
     "res://data/content/cards/dev_basic_attack.json",
@@ -50,5 +50,8 @@
     "res://data/content/generals/zhao_lie.json",
     "res://data/content/generals/zhou_jing.json",
     "res://data/content/generals/han_yue.json"
+  ],
+  "expeditions": [
+    "res://data/content/expeditions/capture_heyuan_county.json"
   ]
 }
