@@ -1,0 +1,20 @@
+{
+  "id": "enemy.elite.gao_wu",
+  "name": "高武",
+  "tier": "elite",
+  "talent_id": "talent.gao_wu.discipline",
+  "troops": 1080,
+  "max_troops": 1080,
+  "morale": 90,
+  "max_morale": 100,
+  "attack": 28,
+  "defense": 26,
+  "army_composition": {"infantry": 0.8, "archer": 0.1, "cavalry": 0.1},
+  "skills": [
+    {"id": "enemy.gao_wu.commanded_strike", "name": "号令进击", "intent_type": "attack", "weight": 4, "cooldown": 0, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 68, "target": "opponent"}]},
+    {"id": "enemy.gao_wu.formation", "name": "严阵以待", "intent_type": "defend", "weight": 3, "cooldown": 0, "conditions": [], "effects": [{"type": "GainArmor", "amount": 75, "target": "self"}]},
+    {"id": "enemy.gao_wu.counter_harangue", "name": "反喝乱心", "intent_type": "disrupt", "weight": 2, "cooldown": 1, "conditions": [], "effects": [{"type": "ModifyMorale", "amount": -10, "target": "opponent"}]},
+    {"id": "enemy.gao_wu.restore_discipline", "name": "申明军纪", "intent_type": "recover", "weight": 1, "cooldown": 2, "conditions": [{"type": "OwnMoraleAtMost", "value": 50}], "effects": [{"type": "ModifyMorale", "amount": 16, "target": "self"}]}
+  ],
+  "presentation": {"description": "军纪严整的精英将领，每回合首次承受的士气削减会减半。"}
+}

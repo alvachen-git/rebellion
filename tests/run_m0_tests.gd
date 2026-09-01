@@ -41,7 +41,7 @@ func _test_content_registry_loads_sample() -> void:
 	_assert_true(registry.load_all(), "content manifest loads without validation errors")
 	_assert_true(registry.card_count() >= 6, "development card definitions remain registered alongside later content")
 	_assert_true(registry.has_card("dev.m0_validation_sample"), "sample card is addressable by stable id")
-	_assert_equal(registry.enemy_count(), 1, "one baseline enemy is registered")
+	_assert_true(registry.enemy_count() >= 1, "baseline enemy remains registered alongside later content")
 	_assert_true(registry.has_enemy("dev.baseline_enemy"), "baseline enemy is addressable by stable id")
 	var sample: Dictionary = registry.get_card("dev.m0_validation_sample")
 	_assert_equal(sample.conditions[0].type, "ArmyRatioAtLeast", "sample condition type is retained")

@@ -1,0 +1,20 @@
+{
+  "id": "enemy.elite.he_wei",
+  "name": "贺巍",
+  "tier": "elite",
+  "talent_id": "talent.he_wei.black_armor",
+  "troops": 1150,
+  "max_troops": 1150,
+  "morale": 76,
+  "max_morale": 100,
+  "attack": 30,
+  "defense": 34,
+  "armor": 180,
+  "army_composition": {"infantry": 0.9, "archer": 0.0, "cavalry": 0.1},
+  "skills": [
+    {"id": "enemy.he_wei.crushing_blow", "name": "破阵重击", "intent_type": "attack", "weight": 4, "cooldown": 0, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 78, "target": "opponent"}]},
+    {"id": "enemy.he_wei.black_guard", "name": "黑甲固守", "intent_type": "defend", "weight": 4, "cooldown": 0, "conditions": [], "effects": [{"type": "GainArmor", "amount": 90, "target": "self"}]},
+    {"id": "enemy.he_wei.shock", "name": "铁骑震阵", "intent_type": "disrupt", "weight": 1, "cooldown": 1, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 40, "target": "opponent"}, {"type": "ModifyMorale", "amount": -6, "target": "opponent"}]}
+  ],
+  "presentation": {"description": "披覆黑甲的精英将领；击破初始护甲后，会短暂失去防守意图。"}
+}

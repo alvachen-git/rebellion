@@ -17,6 +17,7 @@ static func build(
 	var combat: Dictionary = general.combat
 	var player := {
 		"id": general.id,
+		"name": general.name,
 		"talent_id": general.talent_id,
 		"is_player_character": false,
 		"troops": int(combat.troops),

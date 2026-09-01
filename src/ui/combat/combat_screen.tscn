@@ -132,8 +132,62 @@ theme_override_colors/font_color = Color(0.49, 0.49, 0.45, 1)
 theme_override_font_sizes/font_size = 13
 text = "SEED"
 
+[node name="SetupBar" type="PanelContainer" parent="Page"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+theme_override_styles/panel = SubResource("PanelTop")
+
+[node name="Row" type="HBoxContainer" parent="Page/SetupBar"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="OrderLabel" type="Label" parent="Page/SetupBar/Row"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.59, 0.3, 1)
+theme_override_font_sizes/font_size = 15
+text = "战前军令"
+
+[node name="GeneralSelector" type="OptionButton" parent="Page/SetupBar/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(292, 38)
+layout_mode = 2
+focus_mode = 2
+tooltip_text = "选择首轮试玩 Build"
+
+[node name="VersusLabel" type="Label" parent="Page/SetupBar/Row"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.49, 0.45, 1)
+text = "迎战"
+
+[node name="EnemySelector" type="OptionButton" parent="Page/SetupBar/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(210, 38)
+layout_mode = 2
+focus_mode = 2
+tooltip_text = "选择五种普通敌人或两名精英"
+
+[node name="SelectionHint" type="Label" parent="Page/SetupBar/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.61, 0.6, 0.55, 1)
+theme_override_font_sizes/font_size = 13
+text = "选择 Build 与敌情"
+text_overrun_behavior = 3
+
+[node name="StartSelectedButton" type="Button" parent="Page/SetupBar/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(144, 40)
+layout_mode = 2
+focus_mode = 2
+theme_override_colors/font_color = Color(1, 0.93, 0.77, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("ButtonPrimary")
+text = "按军令开战"
+tooltip_text = "以所选武将、敌军与固定 Seed 重开对局"
+
 [node name="Battlefield" type="Control" parent="Page"]
-custom_minimum_size = Vector2(0, 430)
+custom_minimum_size = Vector2(0, 372)
 layout_mode = 2
 size_flags_vertical = 3
 

@@ -1,0 +1,18 @@
+{
+  "id": "enemy.normal.city_defenders",
+  "name": "城防兵",
+  "tier": "normal",
+  "troops": 760,
+  "max_troops": 760,
+  "morale": 72,
+  "max_morale": 100,
+  "attack": 18,
+  "defense": 38,
+  "army_composition": {"infantry": 0.85, "archer": 0.15, "cavalry": 0.0},
+  "skills": [
+    {"id": "enemy.defender.thrust", "name": "垛口攒刺", "intent_type": "attack", "weight": 3, "cooldown": 0, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 48, "target": "opponent"}]},
+    {"id": "enemy.defender.wall", "name": "据垒固守", "intent_type": "defend", "weight": 4, "cooldown": 0, "conditions": [], "effects": [{"type": "GainArmor", "amount": 70, "target": "self"}]},
+    {"id": "enemy.defender.rocks", "name": "滚石压阵", "intent_type": "disrupt", "weight": 1, "cooldown": 1, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 30, "target": "opponent"}, {"type": "ModifyMorale", "amount": -5, "target": "opponent"}]}
+  ],
+  "presentation": {"description": "高防御守军，频繁固守并用滚石扰乱攻势。"}
+}

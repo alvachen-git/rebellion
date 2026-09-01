@@ -3,6 +3,7 @@ class_name CombatScreen
 
 const ContentRegistryScript := preload("res://src/domain/content/content_registry.gd")
 const CombatControllerScript := preload("res://src/domain/combat/combat_controller.gd")
+const GeneralRequestBuilderScript := preload("res://src/domain/combat/general_combat_request_builder.gd")
 
 const BRONZE := Color("#c7984d")
 const PARCHMENT := Color("#e5d5b1")
@@ -11,6 +12,21 @@ const DANGER := Color("#be6356")
 const SUCCESS := Color("#6d9a70")
 const CARD_WIDTH := 150.0
 const CARD_HEIGHT := 202.0
+const GENERAL_IDS := ["general.zhao_lie", "general.zhou_jing", "general.han_yue"]
+const ENEMY_IDS := [
+	"enemy.normal.patrol_inspector",
+	"enemy.normal.local_militia",
+	"enemy.normal.city_defenders",
+	"enemy.normal.crossbow_company",
+	"enemy.normal.overseer_unit",
+	"enemy.elite.gao_wu",
+	"enemy.elite.he_wei",
+]
+const GENERAL_PREVIEW_SEEDS := {
+	"general.zhao_lie": 15,
+	"general.zhou_jing": 10,
+	"general.han_yue": 4,
+}
 
 var battle_request_override: Dictionary = {}
 var _registry
@@ -27,6 +43,10 @@ var _card_buttons: Array[Button] = []
 @onready var army_label: Label = %ArmyLabel
 @onready var action_label: Label = %ActionLabel
 @onready var feedback_label: Label = %FeedbackLabel
+@onready var general_selector: OptionButton = %GeneralSelector
+@onready var enemy_selector: OptionButton = %EnemySelector
+@onready var selection_hint: Label = %SelectionHint
+@onready var start_selected_button: Button = %StartSelectedButton
 @onready var enemy_panel: PanelContainer = %EnemyPanel
 @onready var player_panel: PanelContainer = %PlayerPanel
 @onready var impact_label: Label = %ImpactLabel
@@ -44,7 +64,11 @@ func _ready() -> void:
 	retreat_button.pressed.connect(request_retreat)
 	retreat_dialog.confirmed.connect(confirm_retreat)
 	%RestartButton.pressed.connect(restart_battle)
-	setup_battle(battle_request_override)
+	start_selected_button.pressed.connect(start_selected_battle)
+	general_selector.item_selected.connect(_on_selection_changed)
+	enemy_selector.item_selected.connect(_on_selection_changed)
+	if setup_battle(battle_request_override):
+		_populate_selection_controls()
 
 
 func setup_battle(request: Dictionary = {}) -> bool:
@@ -111,6 +135,26 @@ func restart_battle() -> void:
 	setup_battle(battle_request_override)
 
 
+func start_selected_battle() -> bool:
+	var general_id := String(general_selector.get_selected_metadata())
+	var enemy_id := String(enemy_selector.get_selected_metadata())
+	if general_id.is_empty() or enemy_id.is_empty():
+		_show_boot_error("请先选择率军武将与敌军。")
+		return false
+	var built: Dictionary = GeneralRequestBuilderScript.build(
+		general_id,
+		_registry.get_enemy(enemy_id),
+		int(GENERAL_PREVIEW_SEEDS.get(general_id, 22301)),
+		_registry,
+		"m3-playable-selection"
+	)
+	if not built.ok:
+		_show_boot_error(built.error)
+		return false
+	battle_request_override = built.request
+	return setup_battle(battle_request_override)
+
+
 func combat_snapshot() -> Dictionary:
 	return _controller.snapshot() if _controller != null else {}
 
@@ -123,9 +167,9 @@ func _refresh() -> void:
 	var state: Dictionary = _controller.snapshot()
 	turn_label.text = "第 %d 回合" % state.turn
 	seed_label.text = "SEED %d" % state.seed
-	enemy_name.text = "严阵以待 · %s" % _display_name(state.enemy.id)
+	enemy_name.text = "严阵以待 · %s" % state.enemy.get("name", state.enemy.id)
 	enemy_stats.text = _format_stats(state.enemy)
-	player_name.text = "率军武将 · 赵烈（原型）"
+	player_name.text = "率军武将 · %s" % state.player.get("name", state.player.id)
 	player_stats.text = _format_stats(state.player)
 	army_label.text = _format_army(state.player.army_composition)
 	action_label.text = "%d / %d 行动力" % [state.action_points, state.starting_action_points]
@@ -334,34 +378,44 @@ func _apply_card_style(button: Button, available: bool, tags: Array) -> void:
 	button.add_theme_font_size_override("font_size", 16)
 
 
-func _display_name(identifier: String) -> String:
-	return "基准官军" if identifier == "dev.baseline_enemy" else identifier
+func _populate_selection_controls() -> void:
+	general_selector.clear()
+	for general_id in GENERAL_IDS:
+		var general: Dictionary = _registry.get_general(general_id)
+		general_selector.add_item("%s · %s" % [general.name, general.presentation.build_name])
+		general_selector.set_item_metadata(general_selector.item_count - 1, general_id)
+	enemy_selector.clear()
+	for enemy_id in ENEMY_IDS:
+		var enemy: Dictionary = _registry.get_enemy(enemy_id)
+		var tier_name := "精英" if enemy.get("tier", "normal") == "elite" else "普通"
+		enemy_selector.add_item("%s · %s" % [tier_name, enemy.name])
+		enemy_selector.set_item_metadata(enemy_selector.item_count - 1, enemy_id)
+	_select_metadata(general_selector, combat_snapshot().get("player", {}).get("id", GENERAL_IDS[0]))
+	_select_metadata(enemy_selector, combat_snapshot().get("enemy", {}).get("id", ENEMY_IDS[0]))
+	_on_selection_changed(0)
+
+
+func _select_metadata(selector: OptionButton, value: String) -> void:
+	for index in selector.item_count:
+		if String(selector.get_item_metadata(index)) == value:
+			selector.select(index)
+			return
+
+
+func _on_selection_changed(_index: int) -> void:
+	if general_selector.item_count == 0 or enemy_selector.item_count == 0:
+		return
+	var general: Dictionary = _registry.get_general(String(general_selector.get_selected_metadata()))
+	var enemy: Dictionary = _registry.get_enemy(String(enemy_selector.get_selected_metadata()))
+	selection_hint.text = "%s｜%s" % [general.presentation.build_name, enemy.presentation.description]
 
 
 func _default_request() -> Dictionary:
-	var enemy: Dictionary = _registry.get_enemy("dev.baseline_enemy")
-	return {
-		"battle_id": "m2-ui-prototype",
-		"seed": 22301,
-		"player": {
-			"id": "dev.zhao_lie",
-			"is_player_character": false,
-			"troops": 1000,
-			"max_troops": 1000,
-			"morale": 85,
-			"max_morale": 100,
-			"attack": 25,
-			"defense": 20,
-			"army_composition": {"infantry": 0.35, "archer": 0.15, "cavalry": 0.5},
-		},
-		"enemy": enemy,
-		"deck": [
-			"dev.basic_attack",
-			"dev.basic_attack",
-			"dev.guard",
-			"dev.demoralize",
-			"dev.tactical_cycle",
-			"dev.effect_matrix",
-			"dev.m0_validation_sample",
-		],
-	}
+	var built: Dictionary = GeneralRequestBuilderScript.build(
+		GENERAL_IDS[0],
+		_registry.get_enemy(ENEMY_IDS[0]),
+		int(GENERAL_PREVIEW_SEEDS[GENERAL_IDS[0]]),
+		_registry,
+		"m3-default-playable-battle"
+	)
+	return built.request

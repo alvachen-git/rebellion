@@ -42,6 +42,10 @@ func setup(request: Dictionary, content_registry) -> PackedStringArray:
 	if String(player_source.get("talent_id", "")).is_empty() and content_registry.has_general(player_source.get("id", "")):
 		player_source.talent_id = content_registry.get_general(player_source.id).get("talent_id", "")
 	var player_talent_id: String = player_source.get("talent_id", "")
+	var enemy_source: Dictionary = request.enemy.duplicate(true)
+	if String(enemy_source.get("talent_id", "")).is_empty() and content_registry.has_enemy(enemy_source.get("id", "")):
+		enemy_source.talent_id = content_registry.get_enemy(enemy_source.id).get("talent_id", "")
+	var enemy_talent_id: String = enemy_source.get("talent_id", "")
 	_state = {
 		"battle_id": request.get("battle_id", "development_battle"),
 		"seed": int(request.get("seed", 0)),
@@ -52,8 +56,13 @@ func setup(request: Dictionary, content_registry) -> PackedStringArray:
 		"starting_action_points": int(request.get("starting_action_points", DEFAULT_ACTION_POINTS)),
 		"player": _normalize_combatant(player_source),
 		"player_talent": content_registry.get_talent(player_talent_id) if not player_talent_id.is_empty() else {},
-		"enemy": _normalize_combatant(request.enemy),
-		"enemy_skills": request.enemy.get("skills", []).duplicate(true),
+		"enemy": _normalize_combatant(enemy_source),
+		"enemy_talent": content_registry.get_talent(enemy_talent_id) if not enemy_talent_id.is_empty() else {},
+		"enemy_initial_armor": maxi(int(enemy_source.get("armor", 0)), 0),
+		"enemy_initial_armor_active": int(enemy_source.get("armor", 0)) > 0,
+		"enemy_talent_battle_triggers": {},
+		"enemy_intent_suppression": {},
+		"enemy_skills": enemy_source.get("skills", []).duplicate(true),
 		"enemy_cooldowns": {},
 		"enemy_intent": {},
 		"turn_stats": _new_turn_stats(),
@@ -181,14 +190,17 @@ func _start_player_turn() -> void:
 	_state.turn_stats = _new_turn_stats()
 	_tick_enemy_cooldowns()
 	var drawn: Array = _deck.draw(_state.draw_count)
+	var excluded_intent_types := _active_enemy_intent_suppressions()
 	_state.enemy_intent = EnemyIntentPlannerScript.choose_intent(
 		_state.enemy_skills,
 		_public_combatant(_state.enemy),
 		_public_combatant(_state.player),
 		_state.turn_stats,
 		_state.enemy_cooldowns,
-		_ai_rng
+		_ai_rng,
+		excluded_intent_types
 	)
+	_consume_enemy_intent_suppressions(excluded_intent_types)
 	_state.phase = "player_action"
 	_log.record("player_turn_started", {"turn": _state.turn, "drawn": drawn})
 	_log.record("enemy_intent_revealed", {
@@ -199,6 +211,7 @@ func _start_player_turn() -> void:
 
 func _execute_enemy_turn() -> void:
 	_state.phase = "enemy_turn"
+	_state.enemy_initial_armor_active = false
 	_state.enemy.armor = 0
 	var intent: Dictionary = _state.enemy_intent
 	if intent.is_empty():
@@ -236,9 +249,9 @@ func _resolve_effect(effect: Dictionary, source_side: String) -> void:
 			if source_side == "player" and target_side == "player" and not _active_player_card.is_empty():
 				_try_trigger_armor_talent()
 		"ModifyMorale":
-			_apply_morale(target_side, int(effect.get("amount", 0)))
+			_apply_morale(target_side, int(effect.get("amount", 0)), source_side)
 		"ConsumeOwnMorale":
-			_apply_morale(source_side, -absi(int(effect.get("amount", 0))))
+			_apply_morale(source_side, -absi(int(effect.get("amount", 0))), source_side)
 		"DrawCards":
 			if source_side == "player":
 				var drawn: Array = _deck.draw(maxi(int(effect.get("amount", 0)), 0))
@@ -315,6 +328,7 @@ func _resolve_effect(effect: Dictionary, source_side: String) -> void:
 func _apply_damage(source_side: String, target_side: String, effect: Dictionary) -> void:
 	var source: Dictionary = _state[source_side]
 	var target: Dictionary = _state[target_side]
+	var armor_before := int(target.armor)
 	var calculated := DamageCalculatorScript.preview(effect, source, target)
 	var absorbed := mini(int(target.armor), calculated)
 	target.armor -= absorbed
@@ -328,12 +342,15 @@ func _apply_damage(source_side: String, target_side: String, effect: Dictionary)
 		"troop_damage": troop_damage,
 		"remaining_troops": target.troops,
 	})
+	if source_side == "player" and target_side == "enemy" and armor_before > 0 and int(target.armor) == 0:
+		_try_trigger_enemy_initial_armor_broken()
 	_check_outcome()
 	if is_active() and source_side == "enemy" and target_side == "player" and calculated > 0:
 		_trigger_retaliation()
 
 
-func _apply_morale(target_side: String, amount: int) -> void:
+func _apply_morale(target_side: String, amount: int, source_side: String = "") -> void:
+	amount = _apply_enemy_morale_talent(target_side, amount, source_side)
 	var target: Dictionary = _state[target_side]
 	var before := int(target.morale)
 	target.morale = clampi(before + amount, MORALE_MINIMUM, int(target.max_morale))
@@ -422,6 +439,7 @@ func _normalize_combatant(source: Dictionary) -> Dictionary:
 	var morale := clampi(int(source.get("morale", MORALE_MAXIMUM)), MORALE_MINIMUM, MORALE_MAXIMUM)
 	return {
 		"id": source.get("id", "unknown"),
+		"name": source.get("name", source.get("id", "unknown")),
 		"talent_id": source.get("talent_id", ""),
 		"is_player_character": bool(source.get("is_player_character", false)),
 		"troops": maxi(int(source.get("troops", 1)), 0),
@@ -448,7 +466,86 @@ func _new_turn_stats() -> Dictionary:
 		"attack_cards_played": 0,
 		"enemy_morale_lost": 0,
 		"talent_triggers": {},
+		"enemy_talent_triggers": {},
 	}
+
+
+func _apply_enemy_morale_talent(target_side: String, amount: int, source_side: String) -> int:
+	if target_side != "enemy" or source_side != "player" or amount >= 0:
+		return amount
+	var talent: Dictionary = _state.get("enemy_talent", {})
+	var trigger: Dictionary = talent.get("trigger", {})
+	if trigger.get("type", "") != "FirstMoraleLossEachPlayerTurn":
+		return amount
+	var talent_id: String = talent.get("id", "")
+	var counts: Dictionary = _state.turn_stats.get("enemy_talent_triggers", {})
+	if int(counts.get(talent_id, 0)) >= int(trigger.get("per_turn_limit", 1)):
+		return amount
+	for effect in talent.get("effects", []):
+		if effect.get("type", "") != "ScaleIncomingMorale":
+			continue
+		var original_amount := amount
+		var multiplier := clampf(float(effect.get("multiplier", 1.0)), 0.0, 1.0)
+		amount = -floori(float(absi(amount)) * multiplier)
+		counts[talent_id] = int(counts.get(talent_id, 0)) + 1
+		_log.record("enemy_talent_triggered", {
+			"talent_id": talent_id,
+			"trigger": trigger.get("type", ""),
+			"original_amount": original_amount,
+			"resolved_amount": amount,
+		})
+		break
+	return amount
+
+
+func _try_trigger_enemy_initial_armor_broken() -> void:
+	if int(_state.get("enemy_initial_armor", 0)) <= 0 or not bool(_state.get("enemy_initial_armor_active", false)):
+		return
+	var talent: Dictionary = _state.get("enemy_talent", {})
+	var trigger: Dictionary = talent.get("trigger", {})
+	if trigger.get("type", "") != "InitialArmorBroken":
+		return
+	var talent_id: String = talent.get("id", "")
+	var counts: Dictionary = _state.get("enemy_talent_battle_triggers", {})
+	if int(counts.get(talent_id, 0)) >= int(trigger.get("per_battle_limit", 1)):
+		return
+	_state.enemy_initial_armor_active = false
+	counts[talent_id] = int(counts.get(talent_id, 0)) + 1
+	for effect in talent.get("effects", []):
+		if effect.get("type", "") != "SuppressIntentTypeNextTurn":
+			continue
+		var intent_type: String = effect.get("intent_type", "")
+		var duration := maxi(int(effect.get("duration", 1)), 1)
+		_state.enemy_intent_suppression[intent_type] = maxi(
+			int(_state.enemy_intent_suppression.get(intent_type, 0)),
+			duration
+		)
+	_log.record("enemy_talent_triggered", {
+		"talent_id": talent_id,
+		"trigger": trigger.get("type", ""),
+		"initial_armor": _state.enemy_initial_armor,
+	})
+
+
+func _active_enemy_intent_suppressions() -> Array:
+	var active: Array = []
+	for intent_type in _state.enemy_intent_suppression:
+		if int(_state.enemy_intent_suppression[intent_type]) > 0:
+			active.append(intent_type)
+	return active
+
+
+func _consume_enemy_intent_suppressions(intent_types: Array) -> void:
+	for intent_type in intent_types:
+		var remaining := maxi(int(_state.enemy_intent_suppression.get(intent_type, 0)) - 1, 0)
+		if remaining == 0:
+			_state.enemy_intent_suppression.erase(intent_type)
+		else:
+			_state.enemy_intent_suppression[intent_type] = remaining
+		_log.record("enemy_intent_type_suppressed", {
+			"intent_type": intent_type,
+			"remaining_selections": remaining,
+		})
 
 
 func _try_trigger_pre_card_talent(card: Dictionary) -> void:
@@ -658,6 +755,15 @@ func _validate_request(request: Dictionary, content_registry) -> PackedStringArr
 	if request.has("enemy") and request.enemy is Dictionary:
 		if not request.enemy.get("skills", null) is Array or request.enemy.get("skills", []).is_empty():
 			errors.append("combat request enemy must have at least one skill")
+		var enemy_id: String = request.enemy.get("id", "")
+		var enemy_talent_id: String = request.enemy.get("talent_id", "")
+		if enemy_talent_id.is_empty() and content_registry.has_enemy(enemy_id):
+			enemy_talent_id = content_registry.get_enemy(enemy_id).get("talent_id", "")
+		if not enemy_talent_id.is_empty():
+			if not content_registry.has_talent(enemy_talent_id):
+				errors.append("combat request references unknown enemy talent '%s'" % enemy_talent_id)
+			elif content_registry.get_talent(enemy_talent_id).get("owner_enemy_id", "") != enemy_id:
+				errors.append("combat request enemy talent '%s' does not belong to '%s'" % [enemy_talent_id, enemy_id])
 	if request.has("player") and request.player is Dictionary:
 		var player_id: String = request.player.get("id", "")
 		var talent_id: String = request.player.get("talent_id", "")

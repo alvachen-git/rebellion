@@ -16,7 +16,7 @@ const REQUIRED_CARD_FIELDS := [
 	"upgrade_branches",
 	"presentation",
 ]
-const REQUIRED_TALENT_FIELDS := ["id", "name", "owner_general_id", "trigger", "effects", "presentation"]
+const REQUIRED_TALENT_FIELDS := ["id", "name", "trigger", "effects", "presentation"]
 const REQUIRED_GENERAL_FIELDS := [
 	"id",
 	"name",
@@ -45,6 +45,8 @@ const ALLOWED_EFFECT_TYPES := {
 	"RetaliateOnDamage": true,
 	"PrepareTaggedAttack": true,
 	"RestoreTroops": true,
+	"ScaleIncomingMorale": true,
+	"SuppressIntentTypeNextTurn": true,
 }
 const ALLOWED_CONDITION_TYPES := {
 	"ArmyRatioAtLeast": true,
@@ -63,7 +65,11 @@ const ALLOWED_TALENT_TRIGGER_TYPES := {
 	"NthAttackCardPlayed": true,
 	"FirstArmorGainedFromCard": true,
 	"FirstTaggedAttackCard": true,
+	"FirstMoraleLossEachPlayerTurn": true,
+	"InitialArmorBroken": true,
 }
+const ALLOWED_ENEMY_TIERS := {"normal": true, "elite": true, "boss": true}
+const ALLOWED_INTENT_TYPES := {"attack": true, "defend": true, "disrupt": true, "recover": true}
 
 var _cards: Dictionary = {}
 var _enemies: Dictionary = {}
@@ -175,13 +181,20 @@ func validate_talent_definition(data: Dictionary, source: String = "<memory>") -
 			errors.append("%s: missing talent field '%s'" % [source, field])
 	if data.has("id") and (not data.id is String or data.id.strip_edges().is_empty()):
 		errors.append("%s: talent id must be a non-empty string" % source)
+	var has_general_owner := not String(data.get("owner_general_id", "")).is_empty()
+	var has_enemy_owner := not String(data.get("owner_enemy_id", "")).is_empty()
+	if has_general_owner == has_enemy_owner:
+		errors.append("%s: talent requires exactly one owner_general_id or owner_enemy_id" % source)
 	var trigger = data.get("trigger", null)
 	if not trigger is Dictionary:
 		errors.append("%s: talent trigger must be an object" % source)
 	elif not ALLOWED_TALENT_TRIGGER_TYPES.has(trigger.get("type", "")):
 		errors.append("%s: unsupported talent trigger '%s'" % [source, trigger.get("type", "")])
 	else:
-		if int(trigger.get("per_turn_limit", 0)) < 1:
+		if trigger.type == "InitialArmorBroken":
+			if int(trigger.get("per_battle_limit", 0)) < 1:
+				errors.append("%s: InitialArmorBroken requires per_battle_limit of at least 1" % source)
+		elif int(trigger.get("per_turn_limit", 0)) < 1:
 			errors.append("%s: talent trigger requires per_turn_limit of at least 1" % source)
 		if trigger.type == "NthAttackCardPlayed" and int(trigger.get("count", 0)) < 1:
 			errors.append("%s: NthAttackCardPlayed requires a positive count" % source)
@@ -193,6 +206,83 @@ func validate_talent_definition(data: Dictionary, source: String = "<memory>") -
 	else:
 		for index in effects.size():
 			_validate_effect_entry(effects[index], source, "talent effect", index, errors)
+	return errors
+
+
+func validate_enemy_definition(data: Dictionary, source: String = "<memory>") -> PackedStringArray:
+	var errors := PackedStringArray()
+	for field in ["id", "name", "troops", "morale", "attack", "defense", "army_composition", "skills"]:
+		if not data.has(field):
+			errors.append("%s: missing enemy field '%s'" % [source, field])
+	if data.has("id") and (not data.id is String or data.id.strip_edges().is_empty()):
+		errors.append("%s: enemy id must be a non-empty string" % source)
+	for attribute in ["troops", "morale", "attack", "defense"]:
+		if data.has(attribute) and (not data[attribute] is float and not data[attribute] is int or data[attribute] < 0):
+			errors.append("%s: enemy %s must be a non-negative number" % [source, attribute])
+	var composition = data.get("army_composition", null)
+	if not composition is Dictionary:
+		errors.append("%s: enemy army_composition must be an object" % source)
+	else:
+		var total := 0.0
+		for army_type in ["infantry", "archer", "cavalry"]:
+			if not composition.has(army_type):
+				errors.append("%s: enemy army_composition missing '%s'" % [source, army_type])
+			total += float(composition.get(army_type, 0.0))
+		if not is_equal_approx(total, 1.0):
+			errors.append("%s: enemy army_composition must sum to 1.0" % source)
+	var skills = data.get("skills", null)
+	if not skills is Array or skills.is_empty():
+		errors.append("%s: enemy skills must be a non-empty array" % source)
+	else:
+		var skill_ids := {}
+		for index in skills.size():
+			var skill = skills[index]
+			if not skill is Dictionary:
+				errors.append("%s: skill[%d] must be an object" % [source, index])
+				continue
+			for field in ["id", "intent_type", "weight", "effects"]:
+				if not skill.has(field):
+					errors.append("%s: skill[%d] missing field '%s'" % [source, index, field])
+			var skill_id := String(skill.get("id", ""))
+			if skill_id.is_empty() or skill_ids.has(skill_id):
+				errors.append("%s: skill[%d] id must be non-empty and unique" % [source, index])
+			skill_ids[skill_id] = true
+			if not ALLOWED_INTENT_TYPES.has(skill.get("intent_type", "")):
+				errors.append("%s: skill[%d] has unsupported intent_type '%s'" % [source, index, skill.get("intent_type", "")])
+			if int(skill.get("weight", 0)) < 1:
+				errors.append("%s: skill[%d] weight must be at least 1" % [source, index])
+			if int(skill.get("cooldown", 0)) < 0:
+				errors.append("%s: skill[%d] cooldown cannot be negative" % [source, index])
+			var conditions = skill.get("conditions", [])
+			if not conditions is Array:
+				errors.append("%s: skill[%d] conditions must be an array" % [source, index])
+			else:
+				for condition_index in conditions.size():
+					_validate_typed_entry(conditions[condition_index], source, "skill[%d] condition" % index, condition_index, ALLOWED_CONDITION_TYPES, errors)
+			var effects = skill.get("effects", null)
+			if not effects is Array or effects.is_empty():
+				errors.append("%s: skill[%d] effects must be a non-empty array" % [source, index])
+			else:
+				for effect_index in effects.size():
+					_validate_effect_entry(effects[effect_index], source, "skill[%d] effect" % index, effect_index, errors)
+	if not bool(data.get("development_only", false)):
+		for field in ["tier", "max_troops", "max_morale", "presentation"]:
+			if not data.has(field):
+				errors.append("%s: production enemy missing field '%s'" % [source, field])
+		if not ALLOWED_ENEMY_TIERS.has(data.get("tier", "")):
+			errors.append("%s: production enemy has unsupported tier '%s'" % [source, data.get("tier", "")])
+		var presentation = data.get("presentation", null)
+		if not presentation is Dictionary or String(presentation.get("description", "")).strip_edges().is_empty():
+			errors.append("%s: production enemy requires presentation.description" % source)
+		if skills is Array:
+			for index in skills.size():
+				if not skills[index] is Dictionary:
+					continue
+				for field in ["name", "cooldown", "conditions"]:
+					if not skills[index].has(field):
+						errors.append("%s: production skill[%d] missing field '%s'" % [source, index, field])
+				if String(skills[index].get("name", "")).strip_edges().is_empty():
+					errors.append("%s: production skill[%d] requires a name" % [source, index])
 	return errors
 
 
@@ -306,25 +396,9 @@ func _load_enemy(path: String) -> void:
 		_errors.append(enemy_result.error)
 		return
 	var enemy: Dictionary = enemy_result.value
-	var required_fields := ["id", "name", "troops", "morale", "attack", "defense", "army_composition", "skills"]
-	for field in required_fields:
-		if not enemy.has(field):
-			_errors.append("%s: missing enemy field '%s'" % [path, field])
-	if not enemy.get("skills", null) is Array or enemy.get("skills", []).is_empty():
-		_errors.append("%s: enemy skills must be a non-empty array" % path)
-	else:
-		for index in enemy.skills.size():
-			var skill = enemy.skills[index]
-			if not skill is Dictionary:
-				_errors.append("%s: skill[%d] must be an object" % [path, index])
-				continue
-			for field in ["id", "intent_type", "weight", "effects"]:
-				if not skill.has(field):
-					_errors.append("%s: skill[%d] missing field '%s'" % [path, index, field])
-			if skill.get("effects", null) is Array:
-				for effect_index in skill.effects.size():
-					_validate_typed_entry(skill.effects[effect_index], path, "skill effect", effect_index, ALLOWED_EFFECT_TYPES, _errors)
-	if not _errors.is_empty():
+	var validation_errors := validate_enemy_definition(enemy, path)
+	if not validation_errors.is_empty():
+		_errors.append_array(validation_errors)
 		return
 	var enemy_id: String = enemy.get("id", "")
 	if enemy_id.is_empty():
@@ -373,9 +447,21 @@ func _load_general(path: String) -> void:
 func _validate_content_references() -> void:
 	for talent_id in _talents:
 		var talent: Dictionary = _talents[talent_id]
-		var owner_id: String = talent.get("owner_general_id", "")
-		if not _generals.has(owner_id):
-			_errors.append("talent '%s' references unknown general '%s'" % [talent_id, owner_id])
+		var general_owner_id: String = talent.get("owner_general_id", "")
+		var enemy_owner_id: String = talent.get("owner_enemy_id", "")
+		if not general_owner_id.is_empty() and not _generals.has(general_owner_id):
+			_errors.append("talent '%s' references unknown general '%s'" % [talent_id, general_owner_id])
+		if not enemy_owner_id.is_empty() and not _enemies.has(enemy_owner_id):
+			_errors.append("talent '%s' references unknown enemy '%s'" % [talent_id, enemy_owner_id])
+	for enemy_id in _enemies:
+		var enemy: Dictionary = _enemies[enemy_id]
+		var enemy_talent_id: String = enemy.get("talent_id", "")
+		if enemy_talent_id.is_empty():
+			continue
+		if not _talents.has(enemy_talent_id):
+			_errors.append("enemy '%s' references unknown talent '%s'" % [enemy_id, enemy_talent_id])
+		elif _talents[enemy_talent_id].get("owner_enemy_id", "") != enemy_id:
+			_errors.append("enemy '%s' talent owner does not match" % enemy_id)
 	for general_id in _generals:
 		var general: Dictionary = _generals[general_id]
 		var talent_id: String = general.get("talent_id", "")
@@ -457,6 +543,10 @@ func _validate_effect_entry(entry, source: String, kind: String, index: int, err
 			_require_effect_fields(entry, ["base_power", "uses", "target"], source, kind, index, errors)
 		"PrepareTaggedAttack":
 			_require_effect_fields(entry, ["tag", "multiplier", "uses", "target"], source, kind, index, errors)
+		"ScaleIncomingMorale":
+			_require_effect_fields(entry, ["multiplier", "target"], source, kind, index, errors)
+		"SuppressIntentTypeNextTurn":
+			_require_effect_fields(entry, ["intent_type", "duration"], source, kind, index, errors)
 		"ConditionalEffect":
 			var conditions = entry.get("conditions", null)
 			var nested_effects = entry.get("effects", null)

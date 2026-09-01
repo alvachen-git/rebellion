@@ -1,5 +1,5 @@
 {
-  "content_version": "0.2.0-m3-content-contract",
+  "content_version": "0.3.0-m3-enemies",
   "cards": [
     "res://data/content/cards/m0_validation_sample.json",
     "res://data/content/cards/dev_basic_attack.json",
@@ -28,12 +28,21 @@
     "res://data/content/cards/m3/formation_breaking_crossbow.json"
   ],
   "enemies": [
-    "res://data/content/enemies/dev_baseline_enemy.json"
+    "res://data/content/enemies/dev_baseline_enemy.json",
+    "res://data/content/enemies/patrol_inspector.json",
+    "res://data/content/enemies/local_militia.json",
+    "res://data/content/enemies/city_defenders.json",
+    "res://data/content/enemies/crossbow_company.json",
+    "res://data/content/enemies/overseer_unit.json",
+    "res://data/content/enemies/gao_wu.json",
+    "res://data/content/enemies/he_wei.json"
   ],
   "talents": [
     "res://data/content/talents/zhao_lie_break_formation.json",
     "res://data/content/talents/zhou_jing_iron_wall.json",
-    "res://data/content/talents/han_yue_pierce_formation.json"
+    "res://data/content/talents/han_yue_pierce_formation.json",
+    "res://data/content/talents/gao_wu_discipline.json",
+    "res://data/content/talents/he_wei_black_armor.json"
   ],
   "generals": [
     "res://data/content/generals/zhao_lie.json",

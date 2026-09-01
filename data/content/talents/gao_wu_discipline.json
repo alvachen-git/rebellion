@@ -1,0 +1,8 @@
+{
+  "id": "talent.gao_wu.discipline",
+  "name": "军纪严整",
+  "owner_enemy_id": "enemy.elite.gao_wu",
+  "trigger": {"type": "FirstMoraleLossEachPlayerTurn", "per_turn_limit": 1},
+  "effects": [{"type": "ScaleIncomingMorale", "multiplier": 0.5, "target": "self"}],
+  "presentation": {"description": "每个玩家回合首次受到的士气削减减半，向下取整。"}
+}

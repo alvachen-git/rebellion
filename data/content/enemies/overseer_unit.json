@@ -1,0 +1,18 @@
+{
+  "id": "enemy.normal.overseer_unit",
+  "name": "督战队",
+  "tier": "normal",
+  "troops": 700,
+  "max_troops": 700,
+  "morale": 82,
+  "max_morale": 100,
+  "attack": 23,
+  "defense": 20,
+  "army_composition": {"infantry": 0.75, "archer": 0.15, "cavalry": 0.1},
+  "skills": [
+    {"id": "enemy.overseer.attack", "name": "督阵强攻", "intent_type": "attack", "weight": 3, "cooldown": 0, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 52, "target": "opponent"}]},
+    {"id": "enemy.overseer.intimidate", "name": "斩逃喝令", "intent_type": "disrupt", "weight": 4, "cooldown": 1, "conditions": [], "effects": [{"type": "ModifyMorale", "amount": -12, "target": "opponent"}]},
+    {"id": "enemy.overseer.restore_order", "name": "重整军序", "intent_type": "recover", "weight": 2, "cooldown": 2, "conditions": [{"type": "OwnMoraleAtMost", "value": 55}], "effects": [{"type": "ModifyMorale", "amount": 14, "target": "self"}, {"type": "GainArmor", "amount": 25, "target": "self"}]}
+  ],
+  "presentation": {"description": "以士气打击为主，会在阵脚动摇时重整军序。"}
+}

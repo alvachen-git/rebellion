@@ -1,0 +1,8 @@
+{
+  "id": "talent.he_wei.black_armor",
+  "name": "黑甲",
+  "owner_enemy_id": "enemy.elite.he_wei",
+  "trigger": {"type": "InitialArmorBroken", "per_battle_limit": 1},
+  "effects": [{"type": "SuppressIntentTypeNextTurn", "intent_type": "defend", "duration": 1}],
+  "presentation": {"description": "初始护甲首次被击破后，下一次敌方意图选择排除防守。"}
+}

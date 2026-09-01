@@ -1,0 +1,18 @@
+{
+  "id": "enemy.normal.crossbow_company",
+  "name": "弩军队",
+  "tier": "normal",
+  "troops": 600,
+  "max_troops": 600,
+  "morale": 62,
+  "max_morale": 100,
+  "attack": 32,
+  "defense": 10,
+  "army_composition": {"infantry": 0.2, "archer": 0.8, "cavalry": 0.0},
+  "skills": [
+    {"id": "enemy.crossbow.volley", "name": "弩矢齐射", "intent_type": "attack", "weight": 4, "cooldown": 0, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 70, "target": "opponent"}]},
+    {"id": "enemy.crossbow.barrage", "name": "连弩压制", "intent_type": "attack", "weight": 2, "cooldown": 1, "conditions": [], "effects": [{"type": "RepeatAttack", "base_power": 38, "times": 2, "target": "opponent"}]},
+    {"id": "enemy.crossbow.reload", "name": "盾后装填", "intent_type": "defend", "weight": 2, "cooldown": 0, "conditions": [], "effects": [{"type": "GainArmor", "amount": 25, "target": "self"}]}
+  ],
+  "presentation": {"description": "远程火力突出但防御薄弱，能以连弩造成多段伤害。"}
+}

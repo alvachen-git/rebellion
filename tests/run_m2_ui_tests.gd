@@ -22,6 +22,7 @@ func _run_all() -> void:
 	await _test_end_turn_refreshes_hand_and_intent()
 	await _test_retreat_confirmation_result_state()
 	await _test_victory_and_restart_flow()
+	await _test_m3_playable_selection_rebuilds_battle()
 	await _test_layout_at_target_resolutions()
 	print("TEST SUMMARY: %d passed, %d failed" % [_passed, _failed])
 	quit(0 if _failed == 0 else 1)
@@ -122,12 +123,37 @@ func _test_victory_and_restart_flow() -> void:
 	await _destroy_screen(screen)
 
 
+func _test_m3_playable_selection_rebuilds_battle() -> void:
+	var screen = await _create_screen({})
+	var general_selector: OptionButton = screen.get_node("%GeneralSelector")
+	var enemy_selector: OptionButton = screen.get_node("%EnemySelector")
+	_assert_equal(general_selector.item_count, 3, "playable selector exposes the three approved Builds")
+	_assert_equal(enemy_selector.item_count, 7, "playable selector exposes five normal and two elite enemies")
+	general_selector.select(1)
+	general_selector.item_selected.emit(1)
+	enemy_selector.select(6)
+	enemy_selector.item_selected.emit(6)
+	_assert_true("重步防御反击" in screen.get_node("%SelectionHint").text, "selection hint updates to the chosen Build")
+	screen.get_node("%StartSelectedButton").pressed.emit()
+	await process_frame
+	var state: Dictionary = screen.combat_snapshot()
+	_assert_equal(state.player.id, "general.zhou_jing", "battle selection starts with Zhou Jing")
+	_assert_equal(state.enemy.id, "enemy.elite.he_wei", "battle selection starts against He Wei")
+	_assert_equal(state.enemy.armor, 180, "selected He Wei battle carries initial black armor")
+	_assert_equal(state.seed, 10, "selected Build uses its deterministic preview seed")
+	_assert_true("周靖" in screen.get_node("%PlayerName").text, "battlefield updates the selected general name")
+	_assert_true("贺巍" in screen.get_node("%EnemyName").text, "battlefield updates the selected enemy name")
+	_assert_equal(screen.card_button_count(), 5, "selected Build deals a five-card opening hand")
+	await _destroy_screen(screen)
+
+
 func _test_layout_at_target_resolutions() -> void:
 	for resolution in [Vector2i(1600, 900), Vector2i(1280, 720)]:
 		root.size = resolution
 		var screen = await _create_screen(_request(_standard_deck(), resolution.x))
 		await process_frame
 		var end_button: Button = screen.get_node("%EndTurnButton")
+		var start_button: Button = screen.get_node("%StartSelectedButton")
 		var hand_scroll: ScrollContainer = screen.get_node("Page/Command/Stack/HandScroll")
 		var button_logical_end: Vector2 = end_button.get_global_rect().end
 		var scale_factor := minf(float(resolution.x) / 1600.0, float(resolution.y) / 900.0)
@@ -142,6 +168,7 @@ func _test_layout_at_target_resolutions() -> void:
 			]
 		)
 		_assert_true(hand_scroll.size.y >= 190.0, "hand remains readable at %dx%d" % [resolution.x, resolution.y])
+		_assert_true(start_button.get_global_rect().end.x <= 1600.0, "battle setup action fits the logical canvas at %dx%d" % [resolution.x, resolution.y])
 		_assert_equal(screen.card_button_count(), 5, "all opening cards render at %dx%d" % [resolution.x, resolution.y])
 		await _destroy_screen(screen)
 

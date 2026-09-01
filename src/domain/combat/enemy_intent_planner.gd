@@ -10,7 +10,8 @@ static func choose_intent(
 	player_public: Dictionary,
 	turn_stats: Dictionary,
 	cooldowns: Dictionary,
-	rng
+	rng,
+	excluded_intent_types: Array = []
 ) -> Dictionary:
 	var eligible: Array[Dictionary] = []
 	var total_weight := 0
@@ -18,6 +19,8 @@ static func choose_intent(
 		if not raw_skill is Dictionary:
 			continue
 		var skill: Dictionary = raw_skill
+		if excluded_intent_types.has(skill.get("intent_type", "")):
+			continue
 		var skill_id: String = skill.get("id", "")
 		if int(cooldowns.get(skill_id, 0)) > 0:
 			continue

@@ -1,0 +1,18 @@
+{
+  "id": "enemy.normal.local_militia",
+  "name": "乡勇团",
+  "tier": "normal",
+  "troops": 900,
+  "max_troops": 900,
+  "morale": 42,
+  "max_morale": 100,
+  "attack": 18,
+  "defense": 8,
+  "army_composition": {"infantry": 0.9, "archer": 0.1, "cavalry": 0.0},
+  "skills": [
+    {"id": "enemy.militia.mob", "name": "乱兵齐上", "intent_type": "attack", "weight": 4, "cooldown": 0, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 48, "target": "opponent"}]},
+    {"id": "enemy.militia.press", "name": "人海压阵", "intent_type": "attack", "weight": 2, "cooldown": 1, "conditions": [], "effects": [{"type": "DealDamage", "base_power": 68, "target": "opponent"}]},
+    {"id": "enemy.militia.rally", "name": "乡老鼓噪", "intent_type": "recover", "weight": 2, "cooldown": 1, "conditions": [{"type": "OwnMoraleAtMost", "value": 25}], "effects": [{"type": "ModifyMorale", "amount": 12, "target": "self"}]}
+  ],
+  "presentation": {"description": "兵多甲薄、士气不稳，擅长以人海连续施压。"}
+}
