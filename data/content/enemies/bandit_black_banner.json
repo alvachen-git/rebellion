@@ -1,0 +1,60 @@
+{
+  "id": "enemy.bandit.black_banner",
+  "name": "黑旗头目",
+  "balance_status": "prototype_temporary",
+  "tier": "elite",
+  "faction_tags": [
+    "bandit"
+  ],
+  "troops": 1120,
+  "max_troops": 1120,
+  "morale": 90,
+  "max_morale": 100,
+  "attack": 30,
+  "defense": 24,
+  "army_composition": {
+    "infantry": 0.55,
+    "archer": 0.15,
+    "cavalry": 0.3
+  },
+  "skills": [
+    {
+      "id": "enemy.bandit.black_banner.cleave",
+      "name": "黑旗合击",
+      "intent_type": "attack",
+      "weight": 4,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "DealDamage",
+          "base_power": 82,
+          "target": "opponent"
+        }
+      ]
+    },
+    {
+      "id": "enemy.bandit.black_banner.rally",
+      "name": "聚匪成阵",
+      "intent_type": "defend",
+      "weight": 3,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "GainArmor",
+          "amount": 80,
+          "target": "self"
+        },
+        {
+          "type": "ModifyMorale",
+          "amount": 8,
+          "target": "self"
+        }
+      ]
+    }
+  ],
+  "presentation": {
+    "description": "约束群匪成阵的黑旗头领。"
+  }
+}

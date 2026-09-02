@@ -1,0 +1,18 @@
+{
+  "id": "card.public.rogue.crossbow_suppression",
+  "name": "强弩压阵",
+  "balance_status": "prototype_temporary",
+  "rarity": "rare",
+  "cost": 2,
+  "tags": ["attack", "archery", "government"],
+  "owner_scope": "public",
+  "copy_limit": 1,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [{"type": "ModifyDefense", "amount": -4, "target": "opponent"}, {"type": "DealDamage", "base_power": 80, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "heavy_bolts", "name": "重矢", "overrides": {"effects": [{"type": "ModifyDefense", "amount": -6, "target": "opponent"}, {"type": "DealDamage", "base_power": 105, "target": "opponent"}]}},
+    {"id": "rapid_winch", "name": "疾机", "overrides": {"cost": 1, "effects": [{"type": "ModifyDefense", "amount": -3, "target": "opponent"}, {"type": "DealDamage", "base_power": 65, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "先削弱敌军4点防御，再造成80基础伤害。", "icon_id": "m6.rogue.crossbow_suppression"}
+}

@@ -60,7 +60,7 @@ func _test_research_economy_and_catalog_contracts() -> void:
 	_assert_true(not _economy.is_empty(), "prototype research economy config loads")
 	_assert_true(ResearchManagementServiceScript.validate_economy_definition(_economy).is_empty(), "prototype research economy satisfies its contract")
 	_assert_equal(_economy.balance_status, "prototype_temporary", "research costs remain explicitly marked prototype-only")
-	_assert_equal(_economy.eligible_public_card_ids.size(), 16, "research catalog contains exactly the sixteen M3 public cards")
+	_assert_equal(_economy.eligible_public_card_ids.size(), 22, "research catalog contains the sixteen M3 cards plus six M6 Rogue rewards")
 	_assert_true(ResearchManagementServiceScript.validate_card_catalog(_economy, _cards).is_empty(), "all eligible research cards resolve to valid public definitions")
 	var assault: Dictionary = _registry.get_card("card.public.general.assault")
 	var basic_quote: Dictionary = ResearchManagementServiceScript.quote_unlock(_economy, assault)

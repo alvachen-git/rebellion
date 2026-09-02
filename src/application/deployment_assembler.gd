@@ -122,6 +122,7 @@ func assemble(campaign: Dictionary, expedition_present: bool, request: Dictionar
 		"max_morale": 100,
 		"attack": float(definition.combat.attack) + float(martial_delta) * float(conversions.martial_attack_per_point),
 		"defense": float(definition.combat.defense) + float(leadership_delta) * float(conversions.leadership_defense_per_point),
+		"attributes": general.attributes.duplicate(true),
 		"army_counts": ready.army_counts.duplicate(true),
 		"army_composition": composition,
 	}

@@ -2,6 +2,7 @@
   "id": "enemy.boss.yan_cheng",
   "name": "严成",
   "tier": "boss",
+  "faction_tags": ["government"],
   "talent_id": "talent.yan_cheng.hold_isolated_city",
   "troops": 1750,
   "max_troops": 1750,

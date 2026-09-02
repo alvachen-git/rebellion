@@ -2,6 +2,7 @@
   "id": "enemy.normal.patrol_inspector",
   "name": "官军巡检",
   "tier": "normal",
+  "faction_tags": ["government"],
   "troops": 650,
   "max_troops": 650,
   "morale": 65,

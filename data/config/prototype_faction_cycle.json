@@ -2,7 +2,11 @@
   "id": "config.prototype.faction_cycle.v1",
   "balance_status": "prototype_temporary",
   "cycle_advancing_outcomes": ["success"],
-  "cycle_advancing_expedition_ids": ["expedition.capture_heyuan_county"],
+  "cycle_advancing_expedition_ids": [
+    "expedition.capture_heyuan_county",
+    "expedition.secure_shimen_mountain",
+    "expedition.capture_linze_market"
+  ],
   "new_territory_income_delay_cycles": 1,
   "deferred_systems": ["recruitment_refresh", "world_stage_change"]
 }

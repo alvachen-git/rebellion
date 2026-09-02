@@ -19,6 +19,7 @@ var _campaign
 var _expedition
 var _deployment
 var _encounters
+var _legacy_encounters
 
 
 func setup(registry, config_bundle: Dictionary, save_store, save_root: String) -> PackedStringArray:
@@ -38,6 +39,9 @@ func setup(registry, config_bundle: Dictionary, save_store, save_root: String) -
 	errors.append_array(_deployment.setup(_registry, _config.deployment_rules, _card_definitions()))
 	_encounters = ExpeditionEncounterResolverScript.new()
 	errors.append_array(_encounters.setup(_config.encounters))
+	if _config.get("legacy_encounters", null) is Dictionary:
+		_legacy_encounters = ExpeditionEncounterResolverScript.new()
+		errors.append_array(_legacy_encounters.setup(_config.legacy_encounters))
 	return errors
 
 
@@ -50,6 +54,7 @@ func new_campaign(campaign_id: String, timestamp: String) -> Dictionary:
 	campaign.resources = _integer_dictionary(_config.bootstrap.resources)
 	campaign.army_inventory = _integer_dictionary(_config.bootstrap.army_inventory)
 	campaign.special_resources = _integer_dictionary(_config.bootstrap.special_resources)
+	campaign.popular_support_state.value = clampi(int(_config.bootstrap.get("popular_support", 20)), 0, 100)
 	var starter_public: Array = _starter_public_card_ids()
 	campaign.unlocked_public_cards = starter_public.duplicate()
 	campaign.base_loadout = _initial_base_loadout()
@@ -91,6 +96,8 @@ func phase() -> String:
 	var expedition_state: Dictionary = _expedition.snapshot()
 	if not expedition_state.get("pending_combat", {}).is_empty():
 		return "combat_checkpoint"
+	if not expedition_state.get("pending_encounter", {}).is_empty():
+		return "reward_choice" if expedition_state.pending_encounter.get("kind", "") == "reward" else "encounter_choice"
 	if expedition_state.get("status", "") == "active":
 		return "expedition_map"
 	if expedition_state.get("status", "") in ["awaiting_settlement", "retreated", "failed"]:
@@ -189,25 +196,62 @@ func upgrade_public_card(request: Dictionary) -> Dictionary:
 func expedition_readiness(request: Dictionary) -> Dictionary:
 	if phase() != "main_city":
 		return _failure("game flow: expedition readiness is only available in main_city")
+	var expedition_id := String(request.get("expedition_id", ""))
+	if _is_expedition_captured(expedition_id):
+		return _failure("game flow: expedition target is already controlled")
 	return _deployment.readiness(_campaign.snapshot(), false, request)
+
+
+func available_expeditions() -> Dictionary:
+	if _campaign == null:
+		return _failure("game flow: campaign is not initialized")
+	var campaign: Dictionary = _campaign.snapshot()
+	var targets: Array = []
+	for expedition_id in _config.faction_cycle.cycle_advancing_expedition_ids:
+		var definition: Dictionary = _registry.get_expedition(String(expedition_id))
+		if definition.is_empty():
+			continue
+		var captured := _is_expedition_captured(String(expedition_id))
+		targets.append({
+			"expedition_id": expedition_id,
+			"name": definition.name,
+			"destination_name": definition.get("destination_name", definition.name),
+			"theme": definition.get("theme", ""),
+			"reward_summary": definition.get("reward_summary", ""),
+			"boss_enemy_id": definition.get("generator_profile", {}).get("boss_enemy_id", ""),
+			"captured": captured,
+			"available": not captured and campaign.campaign_status == "active",
+		})
+	var rebellion: Dictionary = campaign.get("rebellion_state", {})
+	return {"ok": true, "errors": PackedStringArray(), "targets": targets, "all_captured": not targets.is_empty() and targets.all(func(target): return bool(target.captured)), "rebellion": rebellion.duplicate(true), "popular_support": campaign.get("popular_support_state", {}).duplicate(true)}
 
 
 func start_expedition(request: Dictionary, _timestamp: String) -> Dictionary:
 	var phase_error: String = _require_phase("main_city", "start expedition")
 	if not phase_error.is_empty():
 		return _failure(phase_error)
+	if _is_expedition_captured(String(request.get("expedition_id", ""))):
+		return _failure("game flow: expedition target is already controlled")
+	var before: Dictionary = _current_envelope()
 	var assembled: Dictionary = _deployment.assemble(_campaign.snapshot(), false, request)
 	if not assembled.ok:
 		return assembled
-	var generated: Dictionary = ExpeditionMapGeneratorScript.generate(_registry.get_expedition(request.expedition_id), int(request.map_seed))
+	var definition: Dictionary = _registry.get_expedition(request.expedition_id)
+	var generator_version := int(definition.get("generator_profile", {}).get("version", 1)) if _config.encounters.has("events") else 1
+	var generated: Dictionary = ExpeditionMapGeneratorScript.generate(definition, int(request.map_seed), generator_version)
 	if not generated.ok:
 		return _failure(generated.error)
 	var run = ExpeditionRunStateScript.new()
-	var errors: PackedStringArray = run.setup(request.run_id, generated.map, assembled.general, assembled.deck, assembled.card_overrides)
+	var initial_support := int(_campaign.snapshot().get("popular_support_state", {}).get("value", 20))
+	var errors: PackedStringArray = run.setup(request.run_id, generated.map, assembled.general, assembled.deck, assembled.card_overrides, initial_support)
 	if not errors.is_empty():
 		return {"ok": false, "errors": errors}
 	_expedition = run
 	_sync_expedition()
+	var saved := _autosave("expedition_started", _timestamp)
+	if not saved.ok:
+		_restore_envelope(before)
+		return saved
 	return {"ok": true, "errors": PackedStringArray(), "phase": phase(), "army_counts": assembled.army_counts, "general": assembled.general}
 
 
@@ -218,14 +262,22 @@ func advance_to_node(node_id: String, timestamp: String) -> Dictionary:
 	var advanced: Dictionary = _expedition.advance_to(node_id)
 	if not advanced.ok:
 		return advanced
-	var resolved: Dictionary = _encounters.resolve(_expedition.current_node(), int(_expedition.snapshot().seed))
+	var expedition_snapshot: Dictionary = _expedition.snapshot()
+	var resolver = _resolver_for_version(int(expedition_snapshot.get("generator_version", 1)))
+	if resolver == null:
+		_restore_envelope(before)
+		return _failure("game flow: encounter resolver is unavailable for this generator version")
+	var resolved: Dictionary = resolver.resolve(_expedition.current_node(), int(expedition_snapshot.seed), _registry.get_expedition(expedition_snapshot.expedition_id))
 	if not resolved.ok:
 		_restore_envelope(before)
 		return resolved
 	var resolution: Dictionary = resolved.resolution
 	var event: String = "expedition_node_settled"
 	var result: Dictionary
-	if not resolution.enemy_id.is_empty():
+	if bool(resolution.get("requires_choice", false)):
+		result = _expedition.begin_choice_resolution(resolution)
+		event = "encounter_choice_created"
+	elif not resolution.enemy_id.is_empty():
 		var enemy: Dictionary = _registry.get_enemy(resolution.enemy_id)
 		if enemy.is_empty():
 			_restore_envelope(before)
@@ -244,6 +296,106 @@ func advance_to_node(node_id: String, timestamp: String) -> Dictionary:
 		return saved
 	result.phase = phase()
 	result.resolution = resolution
+	return result
+
+
+func pending_encounter() -> Dictionary:
+	if _expedition == null:
+		return {}
+	var encounter: Dictionary = _expedition.pending_encounter()
+	for choice in encounter.get("choices", []):
+		var availability: Dictionary = _expedition.choice_availability(String(choice.get("choice_id", "")))
+		choice.available = bool(availability.get("available", false))
+		choice.unavailable_reason = String(availability.get("reason", ""))
+		choice.erase("resolved_effects")
+		var card_id := String(choice.get("card_id", ""))
+		if not card_id.is_empty():
+			var card: Dictionary = _registry.get_card(card_id)
+			choice.card_name = card.get("name", card_id)
+			choice.card_description = card.get("presentation", {}).get("description", "")
+	return encounter
+
+
+func submit_encounter_choice(request: Dictionary, timestamp: String) -> Dictionary:
+	if _expedition != null and _expedition.snapshot().get("choice_action_ids", []).has(String(request.get("action_id", ""))):
+		return {"ok": true, "duplicate": true, "errors": PackedStringArray(), "phase": phase()}
+	if not phase() in ["encounter_choice", "reward_choice"]:
+		return _failure("game flow: no expedition choice is pending")
+	for field in ["action_id", "choice_id"]:
+		if String(request.get(field, "")).strip_edges().is_empty():
+			return _failure("game flow: encounter choice requires %s" % field)
+	var before := _current_envelope()
+	var encounter: Dictionary = _expedition.pending_encounter()
+	var selected: Dictionary = {}
+	for choice in encounter.get("choices", []):
+		if choice.get("choice_id", "") == request.choice_id:
+			selected = choice
+			break
+	var enemy: Dictionary = {}
+	var enemy_id := String(selected.get("combat_enemy_id", ""))
+	if not enemy_id.is_empty(): enemy = _registry.get_enemy(enemy_id)
+	var applied: Dictionary = _expedition.submit_encounter_choice(String(request.action_id), String(request.choice_id), enemy)
+	if not applied.ok:
+		_restore_envelope(before)
+		return applied
+	_sync_expedition()
+	var event := "expedition_terminal_checkpoint" if phase() == "settlement_pending" else ("combat_checkpoint_created" if phase() == "combat_checkpoint" else "encounter_choice_settled")
+	var saved := _autosave(event, timestamp)
+	if not saved.ok:
+		_restore_envelope(before)
+		return saved
+	applied.phase = phase()
+	return applied
+
+
+func use_expedition_item(request: Dictionary, timestamp: String) -> Dictionary:
+	if _expedition != null and _expedition.snapshot().get("applied_item_action_ids", []).has(String(request.get("action_id", ""))):
+		return {"ok": true, "duplicate": true, "errors": PackedStringArray(), "phase": phase()}
+	if _expedition == null or not phase() in ["expedition_map", "encounter_choice", "reward_choice"]:
+		return _failure("game flow: temporary items can only be used between combats")
+	var item_id := ""
+	for item in _expedition.snapshot().get("temporary_items", []):
+		if item.get("instance_id", "") == request.get("item_instance_id", ""):
+			item_id = String(item.item_id)
+			break
+	if item_id.is_empty():
+		return _failure("game flow: unknown temporary item instance")
+	var definition: Dictionary = _encounters.item_definition(item_id)
+	definition.id = item_id
+	var before := _current_envelope()
+	var applied: Dictionary = _expedition.use_temporary_item(String(request.get("action_id", "")), String(request.get("item_instance_id", "")), definition)
+	if not applied.ok:
+		return applied
+	_sync_expedition()
+	var saved := _autosave("expedition_item_used", timestamp)
+	if not saved.ok:
+		_restore_envelope(before)
+		return saved
+	applied.phase = phase()
+	return applied
+
+
+func expedition_run_snapshot() -> Dictionary:
+	if _expedition == null:
+		return {}
+	var result: Dictionary = _expedition.snapshot()
+	for item in result.get("temporary_items", []):
+		var definition: Dictionary = _encounters.item_definition(String(item.get("item_id", "")))
+		item.name = definition.get("name", item.get("item_id", ""))
+		item.description = definition.get("description", "")
+	for node in result.get("visible_nodes", []):
+		if not bool(node.get("is_detail_revealed", false)):
+			continue
+		var enemy_id := String(node.get("enemy_id", ""))
+		if not enemy_id.is_empty():
+			var enemy: Dictionary = _registry.get_enemy(enemy_id)
+			if not enemy.is_empty():
+				node.name = String(enemy.get("name", node.name))
+		var encounter_id := String(node.get("encounter_id", ""))
+		if not encounter_id.is_empty():
+			var encounter_definition: Dictionary = _encounters.event_definition(encounter_id)
+			if not encounter_definition.is_empty():
+				node.name = String(encounter_definition.get("name", node.name))
 	return result
 
 
@@ -332,7 +484,8 @@ func _restore_envelope(source: Dictionary) -> PackedStringArray:
 		return errors
 	var run = null
 	if source.expedition is Dictionary:
-		var generated: Dictionary = ExpeditionMapGeneratorScript.generate(_registry.get_expedition(source.expedition.expedition_id), int(source.expedition.seed))
+		var generator_version := int(source.expedition.get("generator_version", 1))
+		var generated: Dictionary = ExpeditionMapGeneratorScript.generate(_registry.get_expedition(source.expedition.expedition_id), int(source.expedition.seed), generator_version)
 		if not generated.ok:
 			return PackedStringArray([generated.error])
 		run = ExpeditionRunStateScript.new()
@@ -407,8 +560,16 @@ func _general_definitions() -> Array:
 
 
 func _territory_definitions() -> Array:
-	var territory: Dictionary = _registry.get_territory("territory.heyuan_county")
-	return [territory] if not territory.is_empty() else []
+	var result: Array = []
+	for expedition_id in _config.get("faction_cycle", {}).get("cycle_advancing_expedition_ids", []):
+		var expedition: Dictionary = _registry.get_expedition(String(expedition_id))
+		var territory_id := String(expedition.get("territory_id", ""))
+		if territory_id.is_empty() and expedition_id == "expedition.capture_heyuan_county":
+			territory_id = "territory.heyuan_county"
+		var territory: Dictionary = _registry.get_territory(territory_id)
+		if not territory.is_empty():
+			result.append(territory)
+	return result
 
 
 func _starter_public_card_ids() -> Array:
@@ -463,3 +624,19 @@ func _store_failure(result: Dictionary) -> Dictionary:
 
 func _failure(message: String) -> Dictionary:
 	return {"ok": false, "errors": PackedStringArray([message])}
+
+
+func _is_expedition_captured(expedition_id: String) -> bool:
+	if _campaign == null:
+		return false
+	for territory in _campaign.snapshot().get("territories", []):
+		var definition: Dictionary = _registry.get_territory(String(territory.get("territory_id", "")))
+		if definition.get("source_expedition_id", "") == expedition_id:
+			return true
+	return false
+
+
+func _resolver_for_version(generator_version: int):
+	if generator_version == 1 and _legacy_encounters != null:
+		return _legacy_encounters
+	return _encounters

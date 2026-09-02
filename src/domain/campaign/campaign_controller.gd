@@ -71,6 +71,45 @@ func apply_expedition_settlement(request: Dictionary) -> Dictionary:
 			else:
 				next_state.special_resources[loot_id] = int(next_state.special_resources.get(loot_id, 0)) + amount
 				resource_changes[loot_id] = int(resource_changes.get(loot_id, 0)) + amount
+		for card_id in request.get("pending_card_unlocks", []):
+			if next_state.unlocked_public_cards.has(card_id):
+				next_state.resources.military_knowledge = int(next_state.resources.military_knowledge) + 25
+				resource_changes.military_knowledge = int(resource_changes.get("military_knowledge", 0)) + 25
+			else:
+				next_state.unlocked_public_cards.append(card_id)
+	var rebellion_delta := int(request.get("rebellion_delta", 0))
+	if rebellion_delta != 0:
+		var rebellion_action_id := "rebellion:%s" % request_id
+		if not next_state.rebellion_state.applied_effect_ids.has(rebellion_action_id):
+			var previous_value := int(next_state.rebellion_state.value)
+			next_state.rebellion_state.value = clampi(previous_value + rebellion_delta, 0, 100)
+			next_state.rebellion_state.suppression_forecast = int(next_state.rebellion_state.value) >= int(next_state.rebellion_state.suppression_threshold)
+			next_state.rebellion_state.applied_effect_ids.append(rebellion_action_id)
+			next_state.rebellion_state.history.append({
+				"action_id": rebellion_action_id,
+				"action": "apply_expedition_rebellion",
+				"expedition_id": request.expedition_id,
+				"outcome": request.outcome,
+				"delta": rebellion_delta,
+				"from_value": previous_value,
+				"to_value": int(next_state.rebellion_state.value),
+			})
+	var popular_support_delta := int(request.get("popular_support_delta", 0))
+	if popular_support_delta != 0:
+		var support_action_id := "popular-support:%s" % request_id
+		if not next_state.popular_support_state.applied_effect_ids.has(support_action_id):
+			var previous_support := int(next_state.popular_support_state.value)
+			next_state.popular_support_state.value = clampi(previous_support + popular_support_delta, 0, 100)
+			next_state.popular_support_state.applied_effect_ids.append(support_action_id)
+			next_state.popular_support_state.history.append({
+				"action_id": support_action_id,
+				"action": "apply_expedition_popular_support",
+				"expedition_id": request.expedition_id,
+				"outcome": request.outcome,
+				"delta": popular_support_delta,
+				"from_value": previous_support,
+				"to_value": int(next_state.popular_support_state.value),
+			})
 	next_state.applied_settlement_ids.append(request_id)
 	next_state.settlement_history.append({
 		"request_id": request_id,
@@ -79,6 +118,9 @@ func apply_expedition_settlement(request: Dictionary) -> Dictionary:
 		"outcome": request.outcome,
 		"resource_changes": resource_changes.duplicate(true),
 		"army_losses": army_losses.duplicate(true),
+		"rebellion_delta": rebellion_delta,
+		"popular_support_delta": popular_support_delta,
+		"card_unlocks": request.get("pending_card_unlocks", []).duplicate(true) if request.outcome == "success" else [],
 	})
 	next_state.pending_long_term_effects.append({
 		"request_id": request_id,
@@ -786,6 +828,20 @@ func _validate_settlement(request: Dictionary) -> PackedStringArray:
 	for loot_id in request.lost_unbanked_loot:
 		if String(loot_id).strip_edges().is_empty() or not _is_positive_whole_number(request.lost_unbanked_loot[loot_id]):
 			errors.append("settlement: lost loot entries require non-empty ids and positive amounts")
+	if not _is_whole_number(request.get("rebellion_delta", 0)):
+		errors.append("settlement: rebellion_delta must be an integer")
+	if not _is_whole_number(request.get("popular_support_delta", 0)):
+		errors.append("settlement: popular_support_delta must be an integer")
+	var unlocks = request.get("pending_card_unlocks", [])
+	if not unlocks is Array:
+		errors.append("settlement: pending_card_unlocks must be an array")
+	else:
+		var seen_unlocks := {}
+		for card_id in unlocks:
+			if not card_id is String or card_id.strip_edges().is_empty() or seen_unlocks.has(card_id):
+				errors.append("settlement: pending_card_unlocks requires unique non-empty ids")
+			else:
+				seen_unlocks[card_id] = true
 	return errors
 
 
@@ -799,6 +855,10 @@ func _is_non_negative_whole_number(value: Variant) -> bool:
 
 func _is_positive_whole_number(value: Variant) -> bool:
 	return _is_non_negative_whole_number(value) and float(value) > 0.0
+
+
+func _is_whole_number(value: Variant) -> bool:
+	return value is int or (value is float and is_finite(value) and value == floor(value))
 
 
 func _army_action_failure(error: String) -> Dictionary:

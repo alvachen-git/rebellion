@@ -1,6 +1,8 @@
 extends RefCounted
 class_name SaveContentReferenceValidator
 
+const ExpeditionMapGeneratorScript := preload("res://src/domain/expedition/expedition_map_generator.gd")
+
 
 func validate(envelope: Dictionary, registry: RefCounted) -> PackedStringArray:
 	var errors := PackedStringArray()
@@ -51,6 +53,8 @@ func validate(envelope: Dictionary, registry: RefCounted) -> PackedStringArray:
 		_validate_expedition_nodes(expedition, registry, errors)
 		_validate_expedition_actor(expedition.get("general", null), "expedition.general", roster_ids, registry, errors)
 		_validate_card_ids(expedition.get("deck", []), "expedition.deck", registry, errors)
+		_validate_card_ids(expedition.get("temporary_cards", []), "expedition.temporary_cards", registry, errors)
+		_validate_card_ids(expedition.get("pending_card_unlocks", []), "expedition.pending_card_unlocks", registry, errors)
 		_validate_card_overrides(expedition.get("card_overrides", {}), "expedition.card_overrides", registry, errors)
 		var pending_combat = expedition.get("pending_combat", null)
 		if pending_combat is Dictionary and not pending_combat.is_empty():
@@ -63,6 +67,16 @@ func validate(envelope: Dictionary, registry: RefCounted) -> PackedStringArray:
 				if not registry.has_enemy(enemy_id):
 					errors.append("save references: expedition.pending_combat.enemy references missing enemy '%s'" % enemy_id)
 				_validate_talent_id(String(enemy.get("talent_id", "")), "expedition.pending_combat.enemy.talent_id", registry, errors)
+		var pending_encounter = expedition.get("pending_encounter", null)
+		if pending_encounter is Dictionary:
+			for choice in pending_encounter.get("choices", []):
+				if not choice is Dictionary:
+					continue
+				var card_id := String(choice.get("card_id", choice.get("effects", {}).get("add_temporary_card", "")))
+				if not card_id.is_empty(): _validate_card_id(card_id, "expedition.pending_encounter", registry, errors)
+				var enemy_id := String(choice.get("combat_enemy_id", ""))
+				if not enemy_id.is_empty() and not registry.has_enemy(enemy_id):
+					errors.append("save references: expedition.pending_encounter references missing enemy '%s'" % enemy_id)
 	return errors
 
 
@@ -115,7 +129,15 @@ func _validate_expedition_nodes(expedition: Dictionary, registry: RefCounted, er
 	if not registry.has_expedition(expedition_id):
 		return
 	var node_ids := {}
-	for node in registry.get_expedition(expedition_id).get("nodes", []):
+	var definition: Dictionary = registry.get_expedition(expedition_id)
+	var nodes: Array = definition.get("nodes", [])
+	if int(expedition.get("generator_version", 1)) >= 2:
+		var generated: Dictionary = ExpeditionMapGeneratorScript.generate(definition, int(expedition.get("seed", 0)), int(expedition.get("generator_version", 2)))
+		if not generated.ok:
+			errors.append("save references: cannot regenerate expedition map")
+		else:
+			nodes = generated.map.nodes
+	for node in nodes:
 		if node is Dictionary:
 			node_ids[String(node.get("id", ""))] = true
 	var route = expedition.get("route", null)

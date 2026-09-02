@@ -1,0 +1,55 @@
+{
+  "id": "enemy.bandit.grunt",
+  "name": "山匪喽啰",
+  "balance_status": "prototype_temporary",
+  "tier": "normal",
+  "faction_tags": [
+    "bandit"
+  ],
+  "troops": 680,
+  "max_troops": 680,
+  "morale": 68,
+  "max_morale": 100,
+  "attack": 22,
+  "defense": 14,
+  "army_composition": {
+    "infantry": 0.75,
+    "archer": 0.15,
+    "cavalry": 0.1
+  },
+  "skills": [
+    {
+      "id": "enemy.bandit.grunt.rush",
+      "name": "乱刃冲阵",
+      "intent_type": "attack",
+      "weight": 4,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "DealDamage",
+          "base_power": 58,
+          "target": "opponent"
+        }
+      ]
+    },
+    {
+      "id": "enemy.bandit.grunt.shout",
+      "name": "呐喊扰军",
+      "intent_type": "disrupt",
+      "weight": 2,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "ModifyMorale",
+          "amount": -7,
+          "target": "opponent"
+        }
+      ]
+    }
+  ],
+  "presentation": {
+    "description": "人数众多但阵脚松散的山匪。"
+  }
+}

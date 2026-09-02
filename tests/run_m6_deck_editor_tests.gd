@@ -50,7 +50,7 @@ func _test_shared_deck_contract() -> void:
 	_assert_true(not initial.has("general_loadouts"), "new campaign no longer stores per-general loadouts")
 	var editor: Dictionary = flow.loadout_editor_snapshot()
 	_assert_true(editor.ok and editor.minimum_size == 15 and editor.maximum_size == 25, "editor snapshot publishes the authoritative size range")
-	_assert_equal(editor.public_cards.size(), 16, "editor snapshot lists all public research cards")
+	_assert_equal(editor.public_cards.size(), 22, "editor snapshot lists all public research cards, including Rogue rewards")
 	_assert_true(not _option(editor.public_cards, "card.public.cavalry.pursue").unlocked, "locked public cards remain visible but unavailable")
 
 	var fourteen: Array = initial.base_loadout.duplicate()
@@ -117,7 +117,7 @@ func _test_v3_migration_and_frozen_expedition() -> void:
 	}
 	legacy.expedition.deck = _registry.get_general("general.zhao_lie").starting_deck.duplicate()
 	var decoded: Dictionary = SaveGameCodecScript.new().decode(JSON.stringify(legacy))
-	_assert_true(decoded.ok and decoded.to_version == 4, "Save V3 migrates to Save V4")
+	_assert_true(decoded.ok and decoded.to_version == 6, "Save V3 migrates through Save V6")
 	_assert_equal(decoded.value.content_version, "0.6.0-m6-flow", "Save V3 migration preserves source content version")
 	_assert_true(decoded.value.campaign.loadout_system.requires_legacy_recovery, "Save V3 migration requires explicit shared-deck recovery")
 	_assert_equal(decoded.value.campaign.loadout_system.legacy_general_loadouts.size(), 3, "all three obsolete loadouts are retained for audit")
@@ -183,6 +183,8 @@ func _test_military_council_interactions() -> void:
 
 	(shell.find_child("OpenDeploymentButton", true, false) as Button).pressed.emit()
 	await _settle_frames()
+	(shell.find_child("TargetButton_expedition_capture_heyuan_county", true, false) as Button).pressed.emit()
+	await _settle_frames()
 	var breakdown := shell.find_child("DeploymentDeckBreakdown", true, false) as Label
 	_assert_true("16张  +  专属牌 1张  =  出战牌组 17张" in breakdown.text and "独胆破阵" in breakdown.text, "deployment clearly previews Zhao Lie's composed deck")
 	var selector := shell.find_child("DeploymentGeneralSelector", true, false) as OptionButton
@@ -193,6 +195,8 @@ func _test_military_council_interactions() -> void:
 	_assert_true("后发制人" in breakdown.text and not "独胆破阵" in breakdown.text, "switching general changes only the exclusive-card preview")
 
 	(shell.find_child("DeploymentBackButton", true, false) as Button).pressed.emit()
+	await _settle_frames()
+	(shell.find_child("TargetSelectionBackButton", true, false) as Button).pressed.emit()
 	await _settle_frames()
 	(shell.find_child("OpenDeckEditorButton", true, false) as Button).pressed.emit()
 	await _settle_frames()

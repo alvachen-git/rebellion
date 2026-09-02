@@ -2,6 +2,7 @@
   "id": "enemy.normal.crossbow_company",
   "name": "弩军队",
   "tier": "normal",
+  "faction_tags": ["government"],
   "troops": 600,
   "max_troops": 600,
   "morale": 62,

@@ -32,6 +32,18 @@ static func create(campaign_id: String) -> Dictionary:
 		"loadout_system": LoadoutServiceScript.create_system_state(),
 		"territories": [],
 		"faction": FactionCycleServiceScript.create_faction_state(),
+		"rebellion_state": {
+			"value": 0,
+			"suppression_threshold": 60,
+			"suppression_forecast": false,
+			"applied_effect_ids": [],
+			"history": [],
+		},
+		"popular_support_state": {
+			"value": 20,
+			"applied_effect_ids": [],
+			"history": [],
+		},
 		"research": {"applied_action_ids": [], "history": []},
 		"applied_settlement_ids": [],
 		"settlement_history": [],
@@ -61,6 +73,19 @@ static func normalize(source: Dictionary) -> Dictionary:
 		result.general_system = GeneralManagementServiceScript.normalize_system_state(result.general_system)
 	if result.get("faction", null) is Dictionary:
 		result.faction = FactionCycleServiceScript.normalize_faction_state(result.faction)
+	if result.get("rebellion_state", null) is Dictionary:
+		var rebellion_defaults: Dictionary = defaults.rebellion_state
+		for field in rebellion_defaults:
+			if not result.rebellion_state.has(field):
+				result.rebellion_state[field] = rebellion_defaults[field].duplicate(true) if rebellion_defaults[field] is Array else rebellion_defaults[field]
+		result.rebellion_state.value = clampi(int(result.rebellion_state.value), 0, 100)
+		result.rebellion_state.suppression_forecast = int(result.rebellion_state.value) >= int(result.rebellion_state.suppression_threshold)
+	if result.get("popular_support_state", null) is Dictionary:
+		var support_defaults: Dictionary = defaults.popular_support_state
+		for field in support_defaults:
+			if not result.popular_support_state.has(field):
+				result.popular_support_state[field] = support_defaults[field].duplicate(true) if support_defaults[field] is Array else support_defaults[field]
+		result.popular_support_state.value = clampi(int(result.popular_support_state.value), 0, 100)
 	if result.get("loadout_system", null) is Dictionary:
 		result.loadout_system = LoadoutServiceScript.normalize_system_state(result.loadout_system)
 	if result.get("pending_long_term_effects", null) is Array:
@@ -98,7 +123,7 @@ static func validate(state: Dictionary, source: String = "campaign") -> PackedSt
 				errors.append("%s: resources missing '%s'" % [source, resource_id])
 			elif not _is_non_negative_whole_number(resources[resource_id]):
 				errors.append("%s: resource '%s' cannot be negative" % [source, resource_id])
-	for field in ["special_resources", "army_inventory", "card_upgrade_branches", "loadout_system", "research", "general_system", "faction"]:
+	for field in ["special_resources", "army_inventory", "card_upgrade_branches", "loadout_system", "research", "general_system", "faction", "rebellion_state", "popular_support_state"]:
 		if not state.get(field, null) is Dictionary:
 			errors.append("%s: %s must be an object" % [source, field])
 	var special_resources = state.get("special_resources", null)
@@ -116,6 +141,8 @@ static func validate(state: Dictionary, source: String = "campaign") -> PackedSt
 	errors.append_array(GeneralManagementServiceScript.validate_system_state(state.get("general_system", null), "%s.general_system" % source))
 	errors.append_array(GeneralManagementServiceScript.validate_roster(state.get("generals", null), "%s.generals" % source))
 	errors.append_array(FactionCycleServiceScript.validate_faction_state(state.get("faction", null), "%s.faction" % source))
+	_validate_rebellion_state(state.get("rebellion_state", null), source, errors)
+	_validate_popular_support_state(state.get("popular_support_state", null), source, errors)
 	errors.append_array(FactionCycleServiceScript.validate_territory_instances(state.get("territories", null), "%s.territories" % source))
 	if String(state.get("main_city_stage", "")).strip_edges().is_empty():
 		errors.append("%s: main_city_stage must be non-empty" % source)
@@ -132,6 +159,50 @@ static func validate(state: Dictionary, source: String = "campaign") -> PackedSt
 	_validate_unique_string_ids(state.get("applied_finalization_ids", null), "%s.applied_finalization_ids" % source, errors)
 	_validate_finalization_consistency(state, source, errors)
 	return errors
+
+
+static func _validate_rebellion_state(value: Variant, source: String, errors: PackedStringArray) -> void:
+	if not value is Dictionary:
+		return
+	for field in ["value", "suppression_threshold", "suppression_forecast", "applied_effect_ids", "history"]:
+		if not value.has(field):
+			errors.append("%s.rebellion_state missing field '%s'" % [source, field])
+	if not _is_non_negative_whole_number(value.get("value", null)) or int(value.get("value", -1)) > 100:
+		errors.append("%s.rebellion_state.value must be between 0 and 100" % source)
+	if not _is_non_negative_whole_number(value.get("suppression_threshold", null)) or int(value.get("suppression_threshold", 0)) != 60:
+		errors.append("%s.rebellion_state.suppression_threshold must remain 60 for this prototype" % source)
+	if not value.get("suppression_forecast", null) is bool:
+		errors.append("%s.rebellion_state.suppression_forecast must be boolean" % source)
+	elif bool(value.suppression_forecast) != (int(value.get("value", 0)) >= int(value.get("suppression_threshold", 60))):
+		errors.append("%s.rebellion_state.suppression_forecast does not match value" % source)
+	for field in ["applied_effect_ids", "history"]:
+		if not value.get(field, null) is Array:
+			errors.append("%s.rebellion_state.%s must be an array" % [source, field])
+	var seen := {}
+	for action_id in value.get("applied_effect_ids", []):
+		if not action_id is String or action_id.strip_edges().is_empty() or seen.has(action_id):
+			errors.append("%s.rebellion_state.applied_effect_ids requires unique non-empty strings" % source)
+		else:
+			seen[action_id] = true
+
+
+static func _validate_popular_support_state(value: Variant, source: String, errors: PackedStringArray) -> void:
+	if not value is Dictionary:
+		return
+	for field in ["value", "applied_effect_ids", "history"]:
+		if not value.has(field):
+			errors.append("%s.popular_support_state missing field '%s'" % [source, field])
+	if not _is_non_negative_whole_number(value.get("value", null)) or int(value.get("value", -1)) > 100:
+		errors.append("%s.popular_support_state.value must be between 0 and 100" % source)
+	for field in ["applied_effect_ids", "history"]:
+		if not value.get(field, null) is Array:
+			errors.append("%s.popular_support_state.%s must be an array" % [source, field])
+	var seen := {}
+	for action_id in value.get("applied_effect_ids", []):
+		if not action_id is String or action_id.strip_edges().is_empty() or seen.has(action_id):
+			errors.append("%s.popular_support_state.applied_effect_ids requires unique non-empty strings" % source)
+		else:
+			seen[action_id] = true
 
 
 static func _validate_pending_effects(value: Variant, source: String, errors: PackedStringArray) -> void:

@@ -12,6 +12,9 @@ const ALLOWED_NODE_TYPES := {
 	"loot": true,
 	"wealth_risk": true,
 	"boss": true,
+	"merchant": true,
+	"item": true,
+	"card_reward": true,
 }
 const REQUIRED_OBJECTIVES := {
 	"official_road": "armory_destroyed",
@@ -21,6 +24,17 @@ const REQUIRED_OBJECTIVES := {
 
 
 static func validate(data: Dictionary, source: String = "<memory>") -> PackedStringArray:
+	var errors := PackedStringArray()
+	if data.has("generator_profile"):
+		errors.append_array(_validate_generated_definition(data, source))
+	if data.has("nodes"):
+		errors.append_array(_validate_legacy_definition(data, source))
+	elif not data.has("generator_profile"):
+		errors.append("%s: expedition requires authored nodes or generator_profile" % source)
+	return errors
+
+
+static func _validate_legacy_definition(data: Dictionary, source: String) -> PackedStringArray:
 	var errors := PackedStringArray()
 	for field in ["id", "name", "node_count_min", "node_count_max", "entry_node_id", "boss_node_id", "nodes", "edges", "strategic_objectives", "presentation"]:
 		if not data.has(field):
@@ -55,6 +69,110 @@ static func validate(data: Dictionary, source: String = "<memory>") -> PackedStr
 	_validate_reachability(data, node_by_id, outgoing, source, errors)
 	_validate_strategic_objectives(data.get("strategic_objectives", null), node_by_id, source, errors)
 	return errors
+
+
+static func _validate_generated_definition(data: Dictionary, source: String) -> PackedStringArray:
+	var errors := PackedStringArray()
+	for field in ["id", "name", "generator_profile", "presentation"]:
+		if not data.has(field):
+			errors.append("%s: missing generated expedition field '%s'" % [source, field])
+	if String(data.get("id", "")).strip_edges().is_empty():
+		errors.append("%s: expedition id must be a non-empty string" % source)
+	var profile = data.get("generator_profile", null)
+	if not profile is Dictionary:
+		errors.append("%s: generator_profile must be an object" % source)
+		return errors
+	for field in ["version", "layer_count", "nodes_per_middle_layer_min", "nodes_per_middle_layer_max", "node_prefix", "boss_enemy_id", "normal_enemy_pools", "normal_faction_weights", "elite_enemy_pool", "merchant_guard_pool", "event_pool", "boss_reward"]:
+		if not profile.has(field):
+			errors.append("%s: generator_profile missing field '%s'" % [source, field])
+	var version := int(profile.get("version", 0))
+	if not version in [2, 3, 4]:
+		errors.append("%s: generated expedition version must be 2, 3, or 4" % source)
+	if int(profile.get("layer_count", 0)) != 9:
+		errors.append("%s: Rogue prototype must contain exactly 9 layers" % source)
+	var minimum := int(profile.get("nodes_per_middle_layer_min", 0))
+	var maximum := int(profile.get("nodes_per_middle_layer_max", 0))
+	if version == 2 and (minimum != 2 or maximum != 3):
+		errors.append("%s: version 2 middle layers must generate 2 to 3 nodes" % source)
+	elif version == 3 and (minimum != 3 or maximum != 3):
+		errors.append("%s: version 3 middle layers must contain exactly 3 nodes" % source)
+	elif version == 4 and (minimum != 1 or maximum != 4):
+		errors.append("%s: version 4 middle layers must allow 1 to 4 nodes" % source)
+	for field in ["normal_enemy_pools", "normal_faction_weights"]:
+		if not profile.get(field, null) is Dictionary:
+			errors.append("%s: generator_profile.%s must be an object" % [source, field])
+	for field in ["elite_enemy_pool", "merchant_guard_pool", "event_pool"]:
+		if not profile.get(field, null) is Array or profile.get(field, []).is_empty():
+			errors.append("%s: generator_profile.%s must be a non-empty array" % [source, field])
+	if profile.get("normal_enemy_pools", null) is Dictionary:
+		for faction_id in ["government", "bandit"]:
+			if not profile.normal_enemy_pools.get(faction_id, null) is Array or profile.normal_enemy_pools.get(faction_id, []).is_empty():
+				errors.append("%s: normal enemy pool '%s' must be non-empty" % [source, faction_id])
+	if profile.get("normal_faction_weights", null) is Dictionary:
+		for faction_id in ["government", "bandit"]:
+			if int(profile.normal_faction_weights.get(faction_id, 0)) <= 0:
+				errors.append("%s: normal faction weight '%s' must be positive" % [source, faction_id])
+	if String(profile.get("node_prefix", "")).strip_edges().is_empty() or String(profile.get("boss_enemy_id", "")).strip_edges().is_empty():
+		errors.append("%s: node_prefix and boss_enemy_id must be non-empty" % source)
+	if not profile.get("boss_reward", null) is Dictionary:
+		errors.append("%s: boss_reward must be an object" % source)
+	if version >= 3 and profile.get("event_pool", []).size() != 20:
+		errors.append("%s: version 3+ event pool must contain 20 events" % source)
+	if version == 4:
+		_validate_topology_templates(profile.get("topology_templates", null), source, errors)
+	var legacy_profiles = data.get("legacy_generator_profiles", {})
+	if not legacy_profiles is Dictionary:
+		errors.append("%s: legacy_generator_profiles must be an object" % source)
+	elif version >= 3:
+		var legacy_v2 = legacy_profiles.get("2", null)
+		if not legacy_v2 is Dictionary or int(legacy_v2.get("version", 0)) != 2:
+			errors.append("%s: version 3+ expedition must preserve a version 2 legacy profile" % source)
+		if version == 4:
+			var legacy_v3 = legacy_profiles.get("3", null)
+			if not legacy_v3 is Dictionary or int(legacy_v3.get("version", 0)) != 3:
+				errors.append("%s: version 4 expedition must preserve a version 3 legacy profile" % source)
+	return errors
+
+
+static func _validate_topology_templates(value: Variant, source: String, errors: PackedStringArray) -> void:
+	if not value is Array or value.size() < 4:
+		errors.append("%s: version 4 requires at least four topology templates" % source)
+		return
+	var ids := {}
+	for index in value.size():
+		var template = value[index]
+		if not template is Dictionary:
+			errors.append("%s: topology template[%d] must be an object" % [source, index])
+			continue
+		var template_id := String(template.get("id", ""))
+		if template_id.is_empty() or ids.has(template_id):
+			errors.append("%s: topology template ids must be unique and non-empty" % source)
+		ids[template_id] = true
+		if int(template.get("weight", 0)) <= 0:
+			errors.append("%s: topology template '%s' weight must be positive" % [source, template_id])
+		var counts = template.get("layer_node_counts", null)
+		if not counts is Array or counts.size() != 7:
+			errors.append("%s: topology template '%s' requires seven layer counts" % [source, template_id])
+			continue
+		if int(counts[0]) != 3:
+			errors.append("%s: topology template '%s' must begin with three routes" % [source, template_id])
+		for layer_index in counts.size():
+			var count := int(counts[layer_index])
+			if count < 1 or count > 4:
+				errors.append("%s: topology template '%s' layer %d must contain 1 to 4 nodes" % [source, template_id, layer_index + 1])
+			var required_noncombat_count := 2 if layer_index == 1 else (3 if layer_index in [3, 5] else 1)
+			if count < required_noncombat_count:
+				errors.append("%s: topology template '%s' layer %d requires at least %d nodes" % [source, template_id, layer_index + 1, required_noncombat_count])
+		var splits := 0
+		var merges := 0
+		for layer_index in range(counts.size() - 1):
+			var change := int(counts[layer_index + 1]) - int(counts[layer_index])
+			if abs(change) > 2:
+				errors.append("%s: topology template '%s' may change by at most two nodes per layer" % [source, template_id])
+			if change > 0: splits += 1
+			elif change < 0: merges += 1
+		if splits < 2 or merges < 2:
+			errors.append("%s: topology template '%s' requires at least two internal splits and merges" % [source, template_id])
 
 
 static func _validate_node(node: Dictionary, source: String, index: int, errors: PackedStringArray) -> void:

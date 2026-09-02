@@ -27,7 +27,8 @@ func setup(
 	generated_map: Dictionary,
 	general_snapshot: Dictionary,
 	deck: Array,
-	card_overrides: Dictionary = {}
+	card_overrides: Dictionary = {},
+	initial_popular_support: int = 20
 ) -> PackedStringArray:
 	var errors := PackedStringArray()
 	if run_id.strip_edges().is_empty():
@@ -41,6 +42,8 @@ func setup(
 		errors.append("expedition must start with positive morale")
 	if deck.is_empty():
 		errors.append("expedition deck must not be empty")
+	if initial_popular_support < 0 or initial_popular_support > 100:
+		errors.append("expedition initial popular support must be between 0 and 100")
 	if not errors.is_empty():
 		return errors
 	_route = RouteStateScript.new()
@@ -56,6 +59,12 @@ func setup(
 		"run_id": run_id,
 		"expedition_id": generated_map.get("expedition_id", ""),
 		"seed": generated_map.get("seed", 0),
+		"generator_version": int(generated_map.get("generator_version", 1)),
+		"map_signature": String(generated_map.get("map_signature", "legacy-v1")),
+		"expedition_name": String(generated_map.get("name", "")),
+		"destination_name": String(generated_map.get("destination_name", generated_map.get("name", ""))),
+		"theme": String(generated_map.get("theme", "")),
+		"capture_rebellion": int(generated_map.get("capture_rebellion", 0)),
 		"general": player,
 		"initial_troops": int(player.troops),
 		"army_composition": player.army_composition.duplicate(true),
@@ -65,6 +74,18 @@ func setup(
 		"unbanked_loot": {},
 		"lost_unbanked_loot": {},
 		"temporary_buffs": [],
+		"temporary_cards": [],
+		"pending_card_unlocks": [],
+		"permanent_reward_claimed": false,
+		"temporary_items": [],
+		"pending_encounter": {},
+		"choice_action_ids": [],
+		"choice_history": [],
+		"applied_item_action_ids": [],
+		"item_history": [],
+		"pending_rebellion_delta": 0,
+		"initial_popular_support": initial_popular_support,
+		"pending_popular_support_delta": 0,
 		"boss_modifiers": {},
 		"status": "active",
 		"completed_battles": 0,
@@ -89,6 +110,11 @@ func restore(saved: Dictionary, generated_map: Dictionary) -> PackedStringArray:
 		return errors
 	if saved.expedition_id != generated_map.expedition_id or int(saved.seed) != int(generated_map.seed):
 		errors.append("expedition restore identity or seed mismatch")
+	var saved_generator_version := int(saved.get("generator_version", 1))
+	if saved_generator_version != int(generated_map.get("generator_version", 1)):
+		errors.append("expedition restore generator version mismatch")
+	if saved_generator_version >= 2 and String(saved.get("map_signature", "")) != String(generated_map.get("map_signature", "")):
+		errors.append("expedition restore map signature mismatch")
 	if not saved.status in ["active", "awaiting_settlement", "retreated", "failed"]:
 		errors.append("expedition restore status is invalid")
 	_route = RouteStateScript.new()
@@ -118,9 +144,21 @@ func restore(saved: Dictionary, generated_map: Dictionary) -> PackedStringArray:
 	_pending_combat_request = pending.duplicate(true)
 	_pending_node_resolution = _state.get("pending_node_resolution", {}).duplicate(true)
 	_state.erase("pending_node_resolution")
-	for field in ["card_overrides", "army_counts", "resolution_ids", "resolution_history", "settled_battle_ids", "intel"]:
+	for field in ["card_overrides", "army_counts", "resolution_ids", "resolution_history", "settled_battle_ids", "intel", "pending_encounter"]:
 		if not _state.has(field):
-			_state[field] = {} if field in ["card_overrides", "army_counts", "intel"] else []
+			_state[field] = {} if field in ["card_overrides", "army_counts", "intel", "pending_encounter"] else []
+	for field in ["temporary_cards", "pending_card_unlocks", "temporary_items", "choice_action_ids", "choice_history", "applied_item_action_ids", "item_history"]:
+		if not _state.has(field): _state[field] = []
+	for field in ["permanent_reward_claimed"]:
+		if not _state.has(field): _state[field] = false
+	for field in ["pending_rebellion_delta", "capture_rebellion"]:
+		if not _state.has(field): _state[field] = 0
+	if not _state.has("initial_popular_support"):
+		_state.initial_popular_support = 20
+	if not _state.has("pending_popular_support_delta"):
+		_state.pending_popular_support_delta = 0
+	if not _state.has("generator_version"): _state.generator_version = 1
+	if not _state.has("map_signature"): _state.map_signature = "legacy-v1"
 	return errors
 
 
@@ -130,12 +168,36 @@ func _validate_resolution_ledger(saved: Dictionary, generated_map: Dictionary, p
 	var history = saved.get("resolution_history", [])
 	var settled_battle_ids = saved.get("settled_battle_ids", [])
 	var pending_resolution = saved.get("pending_node_resolution", {})
+	var pending_encounter = saved.get("pending_encounter", {})
 	if not resolution_ids is Array or not history is Array or not settled_battle_ids is Array:
 		errors.append("expedition restore resolution ledgers must be arrays")
 		return
 	if not pending_resolution is Dictionary:
 		errors.append("expedition restore pending_node_resolution must be an object")
 		return
+	if not pending_encounter is Dictionary:
+		errors.append("expedition restore pending_encounter must be an object")
+		return
+	if not pending_encounter.is_empty() and (not pending is Dictionary or not pending.is_empty()):
+		errors.append("expedition restore choice checkpoint cannot also retain combat")
+	if not pending_encounter.is_empty():
+		var completes_node := bool(pending_encounter.get("complete_node_on_choice", false))
+		if completes_node and pending_resolution.is_empty():
+			errors.append("expedition restore node choice requires its pending resolution")
+		if not completes_node and not pending_resolution.is_empty():
+			errors.append("expedition restore post-battle reward cannot retain a pending resolution")
+		var encounter_id := String(pending_encounter.get("encounter_id", ""))
+		var choices = pending_encounter.get("choices", null)
+		if encounter_id.is_empty() or not choices is Array or choices.size() < 2:
+			errors.append("expedition restore pending encounter content is invalid")
+		else:
+			var choice_ids := {}
+			for choice in choices:
+				var choice_id := String(choice.get("choice_id", "")) if choice is Dictionary else ""
+				if choice_id.is_empty() or choice_ids.has(choice_id):
+					errors.append("expedition restore pending encounter has invalid choice ids")
+					break
+				choice_ids[choice_id] = true
 	var unique_resolution_ids := {}
 	for resolution_id in resolution_ids:
 		var normalized_id := String(resolution_id)
@@ -166,9 +228,6 @@ func _validate_resolution_ledger(saved: Dictionary, generated_map: Dictionary, p
 			unique_battle_ids[normalized_id] = true
 	if pending_resolution.is_empty():
 		return
-	if not pending is Dictionary or pending.is_empty():
-		errors.append("expedition restore pending node resolution requires pending combat")
-		return
 	var pending_node_id := String(pending_resolution.get("node_id", ""))
 	if pending_node_id != String(saved.route.current_node_id):
 		errors.append("expedition restore pending node resolution does not match the current node")
@@ -177,6 +236,13 @@ func _validate_resolution_ledger(saved: Dictionary, generated_map: Dictionary, p
 		errors.append("expedition restore pending node resolution id must be non-empty")
 	elif unique_resolution_ids.has(pending_resolution_id):
 		errors.append("expedition restore pending node resolution is already settled")
+	if not pending_encounter.is_empty():
+		if not bool(pending_resolution.get("requires_choice", false)):
+			errors.append("expedition restore choice checkpoint requires a choice resolution")
+		return
+	if not pending is Dictionary or pending.is_empty():
+		errors.append("expedition restore pending node resolution requires pending combat")
+		return
 	if unique_battle_ids.has(String(pending.get("battle_id", ""))):
 		errors.append("expedition restore pending combat is already settled")
 	if int(pending_resolution.get("battle_seed", -1)) != int(pending.get("seed", -2)):
@@ -214,6 +280,125 @@ func settle_noncombat_resolution(resolution: Dictionary) -> Dictionary:
 	_record_resolution(next_state, resolution, "noncombat")
 	_state = next_state
 	return {"ok": true, "duplicate": false, "node_id": resolution.node_id, "reason": ""}
+
+
+func begin_choice_resolution(resolution: Dictionary) -> Dictionary:
+	if not _can_change_route():
+		return _failure("当前远征状态不能创建选择检查点")
+	var validation := _validate_resolution(resolution, false)
+	if not validation.is_empty():
+		return _failure(validation)
+	if not bool(resolution.get("requires_choice", false)) or not resolution.get("encounter", null) is Dictionary or resolution.encounter.is_empty():
+		return _failure("节点解析没有可选择内容")
+	_pending_node_resolution = resolution.duplicate(true)
+	_state.pending_encounter = resolution.encounter.duplicate(true)
+	return {"ok": true, "duplicate": false, "encounter": _state.pending_encounter.duplicate(true), "reason": ""}
+
+
+func pending_encounter() -> Dictionary:
+	return _state.get("pending_encounter", {}).duplicate(true)
+
+
+func choice_availability(choice_id: String) -> Dictionary:
+	var encounter: Dictionary = _state.get("pending_encounter", {})
+	if encounter.is_empty():
+		return {"ok": false, "available": false, "reason": "当前没有待处理选择"}
+	var choice := _find_choice(encounter.get("choices", []), choice_id)
+	if choice.is_empty():
+		return {"ok": false, "available": false, "reason": "找不到该选择"}
+	var reason := _requirements_error(choice.get("requirements", {}))
+	return {"ok": true, "available": reason.is_empty(), "reason": reason}
+
+
+func submit_encounter_choice(action_id: String, choice_id: String, enemy: Dictionary = {}) -> Dictionary:
+	if action_id.strip_edges().is_empty() or choice_id.strip_edges().is_empty():
+		return _failure("选择需要稳定 action_id 和 choice_id")
+	if _state.get("choice_action_ids", []).has(action_id):
+		return {"ok": true, "duplicate": true, "reason": ""}
+	var encounter: Dictionary = _state.get("pending_encounter", {})
+	if encounter.is_empty() or _state.get("status", "") != "active" or not _pending_combat_request.is_empty():
+		return _failure("当前没有可提交的远征选择")
+	var choice := _find_choice(encounter.get("choices", []), choice_id)
+	if choice.is_empty():
+		return _failure("找不到选择 '%s'" % choice_id)
+	var requirement_error := _requirements_error(choice.get("requirements", {}))
+	if not requirement_error.is_empty():
+		return _failure(requirement_error)
+	if bool(choice.get("permanent", false)) and bool(_state.get("permanent_reward_claimed", false)):
+		return _failure("本次远征已经选择过永久军略")
+	var next_state := _state.duplicate(true)
+	var applied_effects: Dictionary = choice.get("resolved_effects", choice.get("effects", {}))
+	_apply_effects(next_state, applied_effects, "%s:%s" % [encounter.encounter_id, choice_id])
+	next_state.choice_action_ids.append(action_id)
+	next_state.choice_history.append({"action_id": action_id, "encounter_id": encounter.encounter_id, "choice_id": choice_id, "risk": bool(choice.get("risk", false))})
+	if bool(choice.get("permanent", false)):
+		next_state.permanent_reward_claimed = true
+	_state = next_state
+	_apply_route_effects(applied_effects)
+	_state.pending_encounter = {}
+	if int(_state.general.troops) <= 0 or int(_state.general.morale) <= 0:
+		if not _pending_node_resolution.is_empty() and not _state.resolution_ids.has(_pending_node_resolution.get("resolution_id", "")):
+			_record_resolution(_state, _pending_node_resolution, "event-failure:%s" % choice_id)
+		_state.general_died = false
+		_state.general_injured = true
+		_state.lost_unbanked_loot = _state.unbanked_loot.duplicate(true)
+		_state.unbanked_loot = {}
+		_state.temporary_buffs.clear()
+		_state.temporary_items.clear()
+		_state.temporary_cards.clear()
+		_state.status = "failed"
+		_pending_node_resolution = {}
+		return {"ok": true, "duplicate": false, "started_combat": false, "terminal": true, "choice_id": choice_id, "reason": "event state reached zero"}
+	if not String(choice.get("combat_enemy_id", "")).is_empty():
+		if enemy.is_empty() or enemy.get("id", "") != choice.combat_enemy_id:
+			return _failure("袭击选择缺少匹配的商队护卫")
+		var combat_resolution: Dictionary = _pending_node_resolution.duplicate(true)
+		combat_resolution.enemy_id = choice.combat_enemy_id
+		combat_resolution.victory_loot = choice.get("combat_victory_loot", {}).duplicate(true)
+		combat_resolution.victory_item = String(choice.get("combat_victory_item", ""))
+		combat_resolution.choice_combat = true
+		combat_resolution.chosen_action_id = action_id
+		combat_resolution.battle_seed = int(combat_resolution.get("battle_seed", 0)) ^ _stable_hash(choice_id)
+		_pending_node_resolution = combat_resolution
+		var combat: Dictionary = begin_combat(enemy, int(combat_resolution.battle_seed))
+		if not combat.ok:
+			return combat
+		return {"ok": true, "duplicate": false, "started_combat": true, "request": combat.request, "reason": ""}
+	if bool(encounter.get("complete_node_on_choice", false)):
+		var completed: Dictionary = _route.complete_current_node()
+		if not completed.ok:
+			return completed
+		if not _pending_node_resolution.is_empty() and not _state.resolution_ids.has(_pending_node_resolution.get("resolution_id", "")):
+			_record_resolution(_state, _pending_node_resolution, "choice:%s" % choice_id)
+	_pending_node_resolution = {}
+	return {"ok": true, "duplicate": false, "started_combat": false, "choice_id": choice_id, "reason": ""}
+
+
+func use_temporary_item(action_id: String, item_instance_id: String, item_definition: Dictionary) -> Dictionary:
+	if action_id.strip_edges().is_empty() or item_instance_id.strip_edges().is_empty():
+		return _failure("使用物品需要稳定 action_id 和物品实例 ID")
+	if _state.get("applied_item_action_ids", []).has(action_id):
+		return {"ok": true, "duplicate": true, "reason": ""}
+	if _state.get("status", "") != "active" or not _pending_combat_request.is_empty():
+		return _failure("战斗中或远征结束后不能使用临时物品")
+	var item_index := -1
+	for index in _state.temporary_items.size():
+		if _state.temporary_items[index].get("instance_id", "") == item_instance_id:
+			item_index = index
+			break
+	if item_index < 0:
+		return _failure("找不到临时物品实例")
+	var item_id := String(_state.temporary_items[item_index].item_id)
+	if item_definition.get("id", item_id) != item_id or not item_definition.get("effects", null) is Dictionary:
+		return _failure("临时物品定义不匹配")
+	var next_state := _state.duplicate(true)
+	_apply_effects(next_state, item_definition.effects, "item-use:%s" % action_id)
+	next_state.temporary_items.remove_at(item_index)
+	next_state.applied_item_action_ids.append(action_id)
+	next_state.item_history.append({"action_id": action_id, "item_instance_id": item_instance_id, "item_id": item_id})
+	_state = next_state
+	_apply_route_effects(item_definition.effects)
+	return {"ok": true, "duplicate": false, "item_id": item_id, "reason": ""}
 
 
 func add_unbanked_loot(resource_id: String, amount: int) -> Dictionary:
@@ -257,7 +442,7 @@ func begin_combat(enemy: Dictionary, battle_seed: int) -> Dictionary:
 	if not _pending_combat_request.is_empty():
 		return _failure("当前节点已有待结算战斗")
 	var node: Dictionary = _route.current_node()
-	if not COMBAT_NODE_TYPES.has(node.get("node_type", "")):
+	if not COMBAT_NODE_TYPES.has(node.get("node_type", "")) and not bool(_pending_node_resolution.get("choice_combat", false)):
 		return _failure("当前节点不是战斗节点")
 	if enemy.is_empty() or String(enemy.get("id", "")).is_empty():
 		return _failure("敌军定义不能为空")
@@ -376,6 +561,9 @@ func apply_terminal_combat_result(result: Dictionary) -> Dictionary:
 	_state.lost_unbanked_loot = _state.unbanked_loot.duplicate(true)
 	_state.unbanked_loot = {}
 	_state.temporary_buffs.clear()
+	_state.temporary_items.clear()
+	_state.temporary_cards.clear()
+	_state.pending_encounter = {}
 	_pending_combat_request = {}
 	_state.status = "retreated" if result_status == "retreated" else "failed"
 	return {"ok": true, "status": _state.status, "reason": ""}
@@ -395,7 +583,12 @@ func apply_combat_result(result: Dictionary) -> Dictionary:
 			return applied
 		for resource_id in resolution.get("victory_loot", {}):
 			_state.unbanked_loot[resource_id] = int(_state.unbanked_loot.get(resource_id, 0)) + int(resolution.victory_loot[resource_id])
+		var victory_item := String(resolution.get("victory_item", ""))
+		if not victory_item.is_empty() and _state.temporary_items.size() < 3:
+			_state.temporary_items.append({"instance_id": "%s:victory-item" % resolution.resolution_id, "item_id": victory_item})
 		_record_resolution(_state, resolution, "victory")
+		if _state.get("status", "") == "active" and resolution.get("post_battle_encounter", null) is Dictionary and not resolution.post_battle_encounter.is_empty():
+			_state.pending_encounter = resolution.post_battle_encounter.duplicate(true)
 	else:
 		applied = apply_terminal_combat_result(result)
 		if not applied.ok:
@@ -432,14 +625,19 @@ func create_settlement_request() -> Dictionary:
 		"lost_unbanked_loot": {} if succeeded else _state.lost_unbanked_loot.duplicate(true),
 		"boss_modifiers": _state.boss_modifiers.duplicate(true),
 		"completed_battles": int(_state.completed_battles),
+		"rebellion_delta": int(_state.pending_rebellion_delta) + (int(_state.capture_rebellion) if succeeded else 0),
+		"popular_support_delta": int(_state.pending_popular_support_delta),
+		"pending_card_unlocks": _state.pending_card_unlocks.duplicate() if succeeded else [],
 	}
 	return {"ok": true, "request": request, "reason": ""}
 
 
 func snapshot() -> Dictionary:
 	var result := _state.duplicate(true)
+	result.projected_popular_support = clampi(int(_state.get("initial_popular_support", 20)) + int(_state.get("pending_popular_support_delta", 0)), 0, 100)
 	result.route = _route.snapshot() if _route != null else {}
 	result.visible_nodes = _route.visible_nodes() if _route != null else []
+	result.map_edges = _map.get("edges", []).duplicate(true)
 	result.pending_combat = _pending_combat_request.duplicate(true)
 	result.pending_node_resolution = _pending_node_resolution.duplicate(true)
 	return result
@@ -450,7 +648,7 @@ func current_node() -> Dictionary:
 
 
 func _can_change_route() -> bool:
-	return _state.get("status", "") == "active" and _pending_combat_request.is_empty()
+	return _state.get("status", "") == "active" and _pending_combat_request.is_empty() and _state.get("pending_encounter", {}).is_empty()
 
 
 func _failure(reason: String) -> Dictionary:
@@ -478,6 +676,10 @@ func _validate_resolution(resolution: Dictionary, requires_combat: bool) -> Stri
 
 
 func _apply_effects(state: Dictionary, effects: Dictionary, resolution_id: String) -> void:
+	for resource_id in effects.get("consume_loot", {}):
+		state.unbanked_loot[resource_id] = maxi(0, int(state.unbanked_loot.get(resource_id, 0)) - int(effects.consume_loot[resource_id]))
+		if int(state.unbanked_loot[resource_id]) == 0:
+			state.unbanked_loot.erase(resource_id)
 	for resource_id in effects.get("loot", {}):
 		state.unbanked_loot[resource_id] = int(state.unbanked_loot.get(resource_id, 0)) + int(effects.loot[resource_id])
 	var buff = effects.get("buff", null)
@@ -488,8 +690,80 @@ func _apply_effects(state: Dictionary, effects: Dictionary, resolution_id: Strin
 		state.general.troops = mini(int(state.general.max_troops), int(state.general.troops) + amount)
 	if effects.has("restore_morale"):
 		state.general.morale = mini(int(state.general.max_morale), int(state.general.morale) + int(effects.restore_morale))
+	if effects.has("troops_delta"):
+		state.general.troops = clampi(int(state.general.troops) + int(effects.troops_delta), 0, int(state.general.max_troops))
+	if effects.has("morale_delta"):
+		state.general.morale = clampi(int(state.general.morale) + int(effects.morale_delta), 0, int(state.general.max_morale))
+	var temporary_card := String(effects.get("add_temporary_card", ""))
+	if not temporary_card.is_empty():
+		state.deck.append(temporary_card)
+		state.temporary_cards.append(temporary_card)
+	var pending_unlock := String(effects.get("pending_card_unlock", ""))
+	if not pending_unlock.is_empty() and not state.pending_card_unlocks.has(pending_unlock):
+		state.pending_card_unlocks.append(pending_unlock)
+	var item_id := String(effects.get("add_item", ""))
+	if not item_id.is_empty() and state.temporary_items.size() < 3:
+		state.temporary_items.append({"instance_id": "%s:item:%d" % [resolution_id, state.temporary_items.size()], "item_id": item_id})
+	var consume_item_id := String(effects.get("consume_item_id", ""))
+	if not consume_item_id.is_empty():
+		for index in state.temporary_items.size():
+			if state.temporary_items[index].item_id == consume_item_id:
+				state.temporary_items.remove_at(index)
+				break
+	if effects.has("rebellion_delta"):
+		state.pending_rebellion_delta = int(state.pending_rebellion_delta) + int(effects.rebellion_delta)
+	if effects.has("popular_support_delta"):
+		state.pending_popular_support_delta = int(state.get("pending_popular_support_delta", 0)) + int(effects.popular_support_delta)
+	var boss_modifier_id := String(effects.get("boss_modifier_id", ""))
+	if not boss_modifier_id.is_empty():
+		state.boss_modifiers[boss_modifier_id] = true
 	for key in effects.get("intel", {}):
 		state.intel[key] = effects.intel[key]
+
+
+func _apply_route_effects(effects: Dictionary) -> void:
+	if effects.has("reveal_layers"):
+		_route.reveal_future_layers(int(effects.reveal_layers))
+
+
+func _requirements_error(requirements: Dictionary) -> String:
+	for resource_id in requirements.get("loot", {}):
+		if int(_state.unbanked_loot.get(resource_id, 0)) < int(requirements.loot[resource_id]):
+			return "本次远征的未入库资源不足"
+	if int(requirements.get("inventory_space", 0)) > 0 and _state.temporary_items.size() + int(requirements.inventory_space) > 3:
+		return "临时物品栏已满"
+	var required_item := String(requirements.get("item_id", ""))
+	if not required_item.is_empty():
+		var found := false
+		for item in _state.temporary_items:
+			if item.get("item_id", "") == required_item:
+				found = true
+				break
+		if not found:
+			return "缺少所需临时物品"
+	for attribute_id in requirements.get("attribute", {}):
+		if int(_state.general.get("attributes", {}).get(attribute_id, _state.general.get(attribute_id, 0))) < int(requirements.attribute[attribute_id]):
+			return "武将%s不足" % attribute_id
+	var projected_support := clampi(int(_state.get("initial_popular_support", 20)) + int(_state.get("pending_popular_support_delta", 0)), 0, 100)
+	if requirements.has("popular_support_min") and projected_support < int(requirements.popular_support_min):
+		return "义军民望需要至少%d" % int(requirements.popular_support_min)
+	if requirements.has("popular_support_max") and projected_support > int(requirements.popular_support_max):
+		return "义军民望需要不高于%d" % int(requirements.popular_support_max)
+	return ""
+
+
+func _find_choice(choices: Array, choice_id: String) -> Dictionary:
+	for choice in choices:
+		if choice is Dictionary and choice.get("choice_id", "") == choice_id:
+			return choice.duplicate(true)
+	return {}
+
+
+func _stable_hash(value: String) -> int:
+	var hash_value := 2166136261
+	for byte in value.to_utf8_buffer():
+		hash_value = int((hash_value ^ int(byte)) * 16777619) & 0x7fffffff
+	return hash_value
 
 
 func _record_resolution(state: Dictionary, resolution: Dictionary, outcome: String) -> void:

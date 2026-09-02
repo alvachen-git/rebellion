@@ -2,6 +2,7 @@
   "id": "enemy.normal.overseer_unit",
   "name": "督战队",
   "tier": "normal",
+  "faction_tags": ["government"],
   "troops": 700,
   "max_troops": 700,
   "morale": 82,

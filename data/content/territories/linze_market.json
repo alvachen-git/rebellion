@@ -1,0 +1,10 @@
+{
+  "id": "territory.linze_market",
+  "name": "临泽市",
+  "balance_status": "prototype_temporary",
+  "source_expedition_id": "expedition.capture_linze_market",
+  "main_city_stage_on_capture": "rebel_camp",
+  "independent_city_management": false,
+  "cycle_income": {"main_resources": {"silver": 300, "food": 120, "recruits": 40}, "special_resources": {"resource.warhorse": 20}},
+  "presentation": {"description": "控制临泽商路后提供大量银钱，不开放独立经营。"}
+}

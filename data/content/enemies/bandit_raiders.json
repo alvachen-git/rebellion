@@ -1,0 +1,55 @@
+{
+  "id": "enemy.bandit.raiders",
+  "name": "夺马匪骑",
+  "balance_status": "prototype_temporary",
+  "tier": "normal",
+  "faction_tags": [
+    "bandit"
+  ],
+  "troops": 720,
+  "max_troops": 720,
+  "morale": 76,
+  "max_morale": 100,
+  "attack": 28,
+  "defense": 16,
+  "army_composition": {
+    "infantry": 0.15,
+    "archer": 0.1,
+    "cavalry": 0.75
+  },
+  "skills": [
+    {
+      "id": "enemy.bandit.raiders.charge",
+      "name": "掠阵疾冲",
+      "intent_type": "attack",
+      "weight": 4,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "DealDamage",
+          "base_power": 72,
+          "target": "opponent"
+        }
+      ]
+    },
+    {
+      "id": "enemy.bandit.raiders.feint",
+      "name": "扬尘佯退",
+      "intent_type": "disrupt",
+      "weight": 2,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "ModifyDefense",
+          "amount": -4,
+          "target": "opponent"
+        }
+      ]
+    }
+  ],
+  "presentation": {
+    "description": "骑乘赃马的迅捷匪骑，会从侧翼冲散军阵。"
+  }
+}

@@ -17,7 +17,13 @@
     "card.public.defense.turn_defense_to_offense",
     "card.public.archery.armor_piercing_arrow",
     "card.public.archery.repeating_crossbow",
-    "card.public.archery.prepared_volley"
+    "card.public.archery.prepared_volley",
+    "card.public.rogue.shield_cart_advance",
+    "card.public.rogue.crossbow_suppression",
+    "card.public.rogue.roadside_ambush",
+    "card.public.rogue.seize_grain_rally",
+    "card.public.rogue.reward_the_ranks",
+    "card.public.rogue.borrowed_passage"
   ],
   "unlock_costs_by_rarity": {
     "basic": {"silver": 40, "military_knowledge": 20},

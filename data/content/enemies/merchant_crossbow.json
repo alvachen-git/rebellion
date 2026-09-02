@@ -1,0 +1,55 @@
+{
+  "id": "enemy.merchant.crossbow",
+  "name": "雇佣弩手",
+  "balance_status": "prototype_temporary",
+  "tier": "normal",
+  "faction_tags": [
+    "merchant"
+  ],
+  "troops": 650,
+  "max_troops": 650,
+  "morale": 74,
+  "max_morale": 100,
+  "attack": 27,
+  "defense": 18,
+  "army_composition": {
+    "infantry": 0.25,
+    "archer": 0.7,
+    "cavalry": 0.05
+  },
+  "skills": [
+    {
+      "id": "enemy.merchant.crossbow.shot",
+      "name": "重金强弩",
+      "intent_type": "attack",
+      "weight": 4,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "DealDamage",
+          "base_power": 70,
+          "target": "opponent"
+        }
+      ]
+    },
+    {
+      "id": "enemy.merchant.crossbow.pin",
+      "name": "封路压制",
+      "intent_type": "disrupt",
+      "weight": 2,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "ModifyDefense",
+          "amount": -5,
+          "target": "opponent"
+        }
+      ]
+    }
+  ],
+  "presentation": {
+    "description": "拿钱办事的弩手，装备优于寻常乡勇。"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "card.public.rogue.shield_cart_advance",
+  "name": "盾车推进",
+  "balance_status": "prototype_temporary",
+  "rarity": "advanced",
+  "cost": 1,
+  "tags": ["skill", "defense", "government"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [{"type": "GainArmor", "amount": 45, "target": "self"}, {"type": "DrawCards", "amount": 1, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "iron_wheels", "name": "铁轮", "overrides": {"effects": [{"type": "GainArmor", "amount": 65, "target": "self"}, {"type": "DrawCards", "amount": 1, "target": "self"}]}},
+    {"id": "swift_column", "name": "疾列", "overrides": {"cost": 0, "exhaust": true}}
+  ],
+  "presentation": {"description": "以盾车掩护军阵推进，获得45护甲并抽1张牌。", "icon_id": "m6.rogue.shield_cart_advance"}
+}

@@ -1,0 +1,77 @@
+{
+  "id": "enemy.boss.shimen_chief",
+  "name": "石门寨主",
+  "balance_status": "prototype_temporary",
+  "tier": "boss",
+  "rogue_boss": true,
+  "faction_tags": [
+    "bandit"
+  ],
+  "troops": 1680,
+  "max_troops": 1680,
+  "morale": 88,
+  "max_morale": 100,
+  "attack": 34,
+  "defense": 30,
+  "army_composition": {
+    "infantry": 0.45,
+    "archer": 0.2,
+    "cavalry": 0.35
+  },
+  "skills": [
+    {
+      "id": "enemy.shimen.rockfall",
+      "name": "崖顶落石",
+      "intent_type": "attack",
+      "weight": 4,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "DealDamage",
+          "base_power": 86,
+          "target": "opponent"
+        },
+        {
+          "type": "ModifyMorale",
+          "amount": -6,
+          "target": "opponent"
+        }
+      ]
+    },
+    {
+      "id": "enemy.shimen.stockade",
+      "name": "据寨死守",
+      "intent_type": "defend",
+      "weight": 3,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "GainArmor",
+          "amount": 105,
+          "target": "self"
+        }
+      ]
+    },
+    {
+      "id": "enemy.shimen.howl",
+      "name": "群匪呼啸",
+      "intent_type": "disrupt",
+      "weight": 2,
+      "cooldown": 2,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "ModifyMorale",
+          "amount": -14,
+          "target": "opponent"
+        }
+      ]
+    }
+  ],
+  "boss_modifier_rules": {},
+  "presentation": {
+    "description": "盘踞石门险寨的匪首，以落石和骑匪夹击来犯者。"
+  }
+}

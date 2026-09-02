@@ -2,6 +2,7 @@
   "id": "enemy.normal.local_militia",
   "name": "乡勇团",
   "tier": "normal",
+  "faction_tags": ["government"],
   "troops": 900,
   "max_troops": 900,
   "morale": 42,

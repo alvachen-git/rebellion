@@ -1,0 +1,55 @@
+{
+  "id": "enemy.merchant.escort_captain",
+  "name": "镖队头领",
+  "balance_status": "prototype_temporary",
+  "tier": "elite",
+  "faction_tags": [
+    "merchant"
+  ],
+  "troops": 1100,
+  "max_troops": 1100,
+  "morale": 92,
+  "max_morale": 100,
+  "attack": 30,
+  "defense": 28,
+  "army_composition": {
+    "infantry": 0.5,
+    "archer": 0.3,
+    "cavalry": 0.2
+  },
+  "skills": [
+    {
+      "id": "enemy.merchant.captain.counter",
+      "name": "镖阵反击",
+      "intent_type": "attack",
+      "weight": 4,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "DealDamage",
+          "base_power": 78,
+          "target": "opponent"
+        }
+      ]
+    },
+    {
+      "id": "enemy.merchant.captain.guard",
+      "name": "护镖铁阵",
+      "intent_type": "defend",
+      "weight": 3,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "GainArmor",
+          "amount": 90,
+          "target": "self"
+        }
+      ]
+    }
+  ],
+  "presentation": {
+    "description": "统领商会私兵的老练镖头。"
+  }
+}

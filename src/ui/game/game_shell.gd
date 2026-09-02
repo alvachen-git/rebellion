@@ -19,7 +19,6 @@ const MUTED := Tokens.INK_SOFT
 const DANGER := Tokens.CINNABAR
 const SUCCESS := Tokens.SUCCESS
 const GENERAL_IDS := ["general.zhao_lie", "general.zhou_jing", "general.han_yue"]
-const EXPEDITION_ID := "expedition.capture_heyuan_county"
 
 var save_root_override := ""
 var campaign_id_override := ""
@@ -29,6 +28,7 @@ var _registry
 var _flow
 var _save_store
 var _selected_general_id := GENERAL_IDS[0]
+var _selected_expedition_id := ""
 var _deployment_counts: Dictionary = {}
 var _loadout_draft: Array = []
 var _selected_loadout_card_id := ""
@@ -56,7 +56,7 @@ func start_new_campaign() -> Dictionary:
 		campaign_id = "campaign.%d" % int(Time.get_unix_time_from_system())
 	var result: Dictionary = _flow.new_campaign(campaign_id, _timestamp())
 	if result.ok:
-		_notice = "新军已立，河源县军报已送达。"
+		_notice = "新军已立，河源、石门与临泽三路军报已送达。"
 		_render_current_phase()
 	else:
 		_notice = _result_error(result)
@@ -98,7 +98,7 @@ func open_deployment() -> void:
 	if current_phase() != "main_city":
 		return
 	_deployment_counts = {}
-	_render_deployment()
+	_render_target_selection()
 
 
 func open_deck_editor() -> void:
@@ -118,7 +118,7 @@ func open_deck_editor() -> void:
 func start_selected_expedition() -> Dictionary:
 	var request := {
 		"run_id": "run.%d.%d" % [int(Time.get_unix_time_from_system()), _action_sequence],
-		"expedition_id": EXPEDITION_ID,
+		"expedition_id": _selected_expedition_id,
 		"general_id": _selected_general_id,
 		"map_seed": map_seed_override if map_seed_override >= 0 else int(Time.get_unix_time_from_system()) & 0x7fffffff,
 	}
@@ -149,7 +149,7 @@ func confirm_settlement() -> Dictionary:
 	var outcome: String = String(_flow.snapshot().get("expedition", {}).get("status", ""))
 	var result: Dictionary = _flow.finalize_expedition(_timestamp())
 	if result.ok:
-		_notice = "河源县已纳入义军版图。" if outcome == "awaiting_settlement" else "远征已经收束，伤亡与损失已登记。"
+		_notice = "目标已纳入义军版图。" if outcome == "awaiting_settlement" else "远征已经收束，伤亡与损失已登记。"
 		_render_current_phase()
 	else:
 		_notice = _result_error(result)
@@ -166,7 +166,8 @@ func _setup_flow() -> PackedStringArray:
 	return _flow.setup(_registry, {
 		"bootstrap": _load_json("res://data/config/prototype_campaign_bootstrap.json"),
 		"deployment_rules": _load_json("res://data/config/prototype_deployment_rules.json"),
-		"encounters": _load_json("res://data/config/prototype_heyuan_encounters.json"),
+		"encounters": _load_json("res://data/config/prototype_rogue_expeditions.json"),
+		"legacy_encounters": _load_json("res://data/config/prototype_heyuan_encounters.json"),
 		"army_economy": _load_json("res://data/config/prototype_army_economy.json"),
 		"research_economy": _load_json("res://data/config/prototype_research_economy.json"),
 		"general_progression": _load_json("res://data/config/prototype_general_progression.json"),
@@ -183,6 +184,8 @@ func _render_current_phase() -> void:
 				_render_main_city()
 		"expedition_map":
 			_render_map()
+		"encounter_choice", "reward_choice":
+			_render_encounter()
 		"combat_checkpoint":
 			_render_combat()
 		"settlement_pending":
@@ -200,13 +203,13 @@ func _render_welcome() -> void:
 	page.name = "WelcomeStage"
 	page.alignment = BoxContainer.ALIGNMENT_CENTER
 	page.add_theme_constant_override("separation", 18)
-	var eyebrow := _label("VERTICAL SLICE · 河源县", 15, BRONZE)
+	var eyebrow := _label("VERTICAL SLICE · 三路远征", 15, BRONZE)
 	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	page.add_child(eyebrow)
 	var title := _label("山河将倾，举旗此刻", 50, PARCHMENT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	page.add_child(title)
-	var copy := _label("整军、择将、定路线。攻取河源县，把第一座城带回义军大营。", 19, MUTED)
+	var copy := _label("整军、择将、定路线。在河源、石门与临泽之间选择下一处目标。", 19, MUTED)
 	copy.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	page.add_child(copy)
 	page.add_child(_spacer(0, 20))
@@ -264,9 +267,24 @@ func _render_main_city() -> void:
 	expedition_button.name = "OpenDeploymentButton"
 	expedition_button.unique_name_in_owner = true
 	expedition_button.pressed.connect(open_deployment)
+	var target_state: Dictionary = _flow.available_expeditions()
+	expedition_button.disabled = bool(target_state.get("all_captured", false))
+	if expedition_button.disabled:
+		expedition_button.text = "三地平定"
 	heading.add_child(expedition_button)
 	page.add_child(heading)
 	page.add_child(_resource_strip(campaign))
+	var rebellion: Dictionary = campaign.get("rebellion_state", {})
+	var rebellion_text := "叛乱值 %d / 100" % int(rebellion.get("value", 0))
+	if bool(rebellion.get("suppression_forecast", false)):
+		rebellion_text += "  ·  朝廷正在筹备围剿"
+	var rebellion_label := _label(rebellion_text, 15, DANGER if bool(rebellion.get("suppression_forecast", false)) else BRONZE)
+	rebellion_label.name = "RebellionStatusLabel"
+	page.add_child(rebellion_label)
+	var popular_support: Dictionary = campaign.get("popular_support_state", {})
+	var support_label := _label("义军民望 %d / 100" % int(popular_support.get("value", 20)), 15, BRONZE)
+	support_label.name = "PopularSupportStatusLabel"
+	page.add_child(support_label)
 	var territory_summary := _label(_territory_summary(campaign), 14, MUTED)
 	territory_summary.name = "TerritorySummary"
 	page.add_child(territory_summary)
@@ -285,7 +303,7 @@ func _render_main_city() -> void:
 
 func _render_legacy_recovery() -> void:
 	phase_label.text = "旧档整备恢复"
-	save_status.text = "Save V4 · 需要玩家确认"
+	save_status.text = "旧档迁移 · 需要玩家确认"
 	var page := VBoxContainer.new()
 	page.name = "LegacyRecoveryStage"
 	page.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -470,7 +488,6 @@ func _public_library_column(editor: Dictionary) -> Control:
 	for card in editor.public_cards:
 		var row := HBoxContainer.new()
 		var current_count := _loadout_draft.count(card.id)
-		var status := "%d/%d" % [current_count, int(card.copy_limit)] if card.unlocked else "军学未解锁"
 		var select = CardViewScript.new()
 		select.configure(card, {
 			"available": bool(card.unlocked),
@@ -565,6 +582,50 @@ func _growth_actions(campaign: Dictionary) -> Control:
 	return column
 
 
+func _render_target_selection() -> void:
+	phase_label.text = "义军大营  /  选择远征目标"
+	save_status.text = "目标确认前不会离营"
+	var result: Dictionary = _flow.available_expeditions()
+	var page := VBoxContainer.new()
+	page.name = "ExpeditionTargetStage"
+	page.add_theme_constant_override("separation", 15)
+	page.add_child(_label("三路军报", 38, PARCHMENT))
+	page.add_child(_label("选择一处尚未控制的目标。地图、遭遇与奖励将在出征时由 Seed 冻结。", 16, MUTED))
+	var rebellion: Dictionary = result.get("rebellion", {})
+	var warning := "当前叛乱值 %d / 100" % int(rebellion.get("value", 0))
+	if bool(rebellion.get("suppression_forecast", false)):
+		warning += "  ·  朝廷正在筹备围剿（本批仅预告）"
+	page.add_child(_label(warning, 15, DANGER if bool(rebellion.get("suppression_forecast", false)) else BRONZE))
+	page.add_child(_label("义军民望 %d / 100" % int(result.get("popular_support", {}).get("value", 20)), 15, BRONZE))
+	page.add_child(HSeparator.new())
+	var targets := HBoxContainer.new()
+	targets.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	targets.add_theme_constant_override("separation", 18)
+	for target in result.get("targets", []):
+		var column := VBoxContainer.new()
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		column.add_theme_constant_override("separation", 10)
+		column.add_child(_label(String(target.destination_name), 28, PARCHMENT))
+		column.add_child(_label(String(target.theme), 17, BRONZE))
+		var boss: Dictionary = _registry.get_enemy(String(target.boss_enemy_id))
+		var detail := _label("首领：%s\n主要收益：%s\n路线：9层随机分支 · 约5–7战" % [boss.get("name", "未知"), target.reward_summary], 15, MUTED)
+		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(detail)
+		var button := _button("已控制" if target.captured else "选择此地  →", not target.captured, Vector2(0, 52))
+		button.name = "TargetButton_%s" % _node_safe_id(String(target.expedition_id))
+		button.disabled = bool(target.captured)
+		button.pressed.connect(_select_expedition_target.bind(String(target.expedition_id)))
+		column.add_child(button)
+		targets.add_child(column)
+	page.add_child(targets)
+	var back := _button("返回主城", false, Vector2(160, 44))
+	back.name = "TargetSelectionBackButton"
+	back.size_flags_horizontal = Control.SIZE_SHRINK_END
+	back.pressed.connect(_render_main_city)
+	page.add_child(back)
+	_set_stage(page)
+
+
 func _render_deployment() -> void:
 	phase_label.text = "义军大营  /  出征整备"
 	save_status.text = "尚未离营"
@@ -572,7 +633,8 @@ func _render_deployment() -> void:
 	var page := VBoxContainer.new()
 	page.name = "DeploymentStage"
 	page.add_theme_constant_override("separation", 16)
-	page.add_child(_label("攻取河源县", 38, PARCHMENT))
+	var expedition_definition: Dictionary = _registry.get_expedition(_selected_expedition_id)
+	page.add_child(_label(String(expedition_definition.get("name", "出征整备")), 38, PARCHMENT))
 	page.add_child(_label("选择率军武将，冻结兵种、属性与“共用基础牌 + 武将专属牌”。", 16, MUTED))
 	page.add_child(HSeparator.new())
 	var selector_row := HBoxContainer.new()
@@ -591,25 +653,11 @@ func _render_deployment() -> void:
 	selector.item_selected.connect(_deployment_general_changed.bind(selector))
 	selector_row.add_child(selector)
 	page.add_child(selector_row)
-	var general_cards := HBoxContainer.new()
-	general_cards.add_theme_constant_override("separation", Tokens.SPACE_MD)
-	for general_id in GENERAL_IDS:
-		var general := _campaign_general(campaign, general_id)
-		var card = GeneralCardViewScript.new()
-		var available: bool = general.get("status", "") != "deceased" and general.get("injury", {}).get("status", "healthy") == "healthy"
-		card.configure(general, {
-			"selected": general_id == _selected_general_id,
-			"available": available,
-			"reason": "阵亡" if general.get("status", "") == "deceased" else "重伤 · 不可出征",
-		}, GeneralCardViewScript.Density.COMPACT)
-		card.pressed.connect(_select_deployment_general.bind(general_id))
-		general_cards.add_child(card)
-	page.add_child(general_cards)
-	var readiness: Dictionary = _flow.expedition_readiness({"expedition_id": EXPEDITION_ID, "general_id": _selected_general_id})
+	var readiness: Dictionary = _flow.expedition_readiness({"expedition_id": _selected_expedition_id, "general_id": _selected_general_id})
 	if readiness.ok and _deployment_counts.is_empty():
 		_deployment_counts = readiness.army_counts.duplicate(true)
 	if not _deployment_counts.is_empty():
-		readiness = _flow.expedition_readiness({"expedition_id": EXPEDITION_ID, "general_id": _selected_general_id, "army_counts": _deployment_counts})
+		readiness = _flow.expedition_readiness({"expedition_id": _selected_expedition_id, "general_id": _selected_general_id, "army_counts": _deployment_counts})
 	var workspace := HBoxContainer.new()
 	workspace.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	workspace.add_theme_constant_override("separation", 30)
@@ -657,7 +705,7 @@ func _render_deployment() -> void:
 	actions.add_theme_constant_override("separation", 12)
 	var back := _button("返回主城", false, Vector2(150, 48))
 	back.name = "DeploymentBackButton"
-	back.pressed.connect(_render_main_city)
+	back.pressed.connect(_render_target_selection)
 	actions.add_child(back)
 	var start := _button("确认军令，开始远征", true, Vector2(240, 48))
 	start.name = "StartExpeditionButton"
@@ -672,35 +720,75 @@ func _render_deployment() -> void:
 
 
 func _render_map() -> void:
-	var snapshot: Dictionary = _flow.snapshot()
-	var expedition: Dictionary = snapshot.expedition
-	phase_label.text = "攻取河源县  /  行军图"
+	var expedition: Dictionary = _flow.expedition_run_snapshot()
+	phase_label.text = "%s  /  行军图" % expedition.expedition_name
 	save_status.text = "SEED %d · 节点后自动保存" % int(expedition.seed)
 	var page := VBoxContainer.new()
 	page.name = "ExpeditionMapStage"
 	page.add_theme_constant_override("separation", 10)
 	var heading := HBoxContainer.new()
-	var title := _label("河源县行军图", 34, PARCHMENT)
+	var title := _label("%s行军图" % expedition.destination_name, 34, PARCHMENT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.add_child(title)
 	heading.add_child(_label("%s  ·  兵力 %d  ·  士气 %d" % [expedition.general.name, int(expedition.general.troops), int(expedition.general.morale)], 16, MUTED))
 	page.add_child(heading)
-	page.add_child(_label("战利品袋：%s" % _loot_text(expedition.unbanked_loot), 15, BRONZE))
+	page.add_child(_label("战利品袋：%s  ·  临时牌 +%d  ·  民望 %d（本次 %+d）  ·  本次叛乱 %+d" % [_loot_text(expedition.unbanked_loot), expedition.temporary_cards.size(), int(expedition.projected_popular_support), int(expedition.pending_popular_support_delta), int(expedition.pending_rebellion_delta)], 15, BRONZE))
+	page.add_child(_label("全图显示节点类别；抵达或使用斥候令牌后可查看具体事件与敌军。", 13, MUTED))
+	page.add_child(_label("图例：战=普通战  锐=精英  事=事件  商=商人  补=补给  物=物品  策=卡牌  城=决战", 13, MUTED))
+	page.add_child(_temporary_item_bar(expedition))
 	var canvas = ExpeditionMapCanvasScript.new()
 	canvas.name = "RouteMap"
 	canvas.unique_name_in_owner = true
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas.node_selected.connect(select_map_node)
 	page.add_child(canvas)
-	var definition: Dictionary = _registry.get_expedition(EXPEDITION_ID)
-	canvas.configure(expedition.visible_nodes, definition.edges, expedition.route)
+	canvas.configure(expedition.visible_nodes, expedition.map_edges, expedition.route)
 	if not _notice.is_empty():
 		page.add_child(_notice_label())
 	_set_stage(page)
 
 
+func _render_encounter() -> void:
+	var expedition: Dictionary = _flow.expedition_run_snapshot()
+	var encounter: Dictionary = _flow.pending_encounter()
+	phase_label.text = "%s  /  %s" % [expedition.destination_name, "军略选择" if encounter.get("kind", "") == "reward" else "途中遭遇"]
+	save_status.text = "选择内容已冻结并自动保存"
+	var page := VBoxContainer.new()
+	page.name = "ExpeditionEncounterStage"
+	page.alignment = BoxContainer.ALIGNMENT_CENTER
+	page.add_theme_constant_override("separation", 14)
+	page.add_child(_label(String(encounter.get("title", "途中遭遇")), 40, PARCHMENT))
+	var description := _label(String(encounter.get("description", "")), 17, MUTED)
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	page.add_child(description)
+	page.add_child(_label("兵力 %d  ·  士气 %d  ·  民望 %d（本次 %+d）  ·  战利品 %s" % [int(expedition.general.troops), int(expedition.general.morale), int(expedition.projected_popular_support), int(expedition.pending_popular_support_delta), _loot_text(expedition.unbanked_loot)], 15, BRONZE))
+	page.add_child(_temporary_item_bar(expedition))
+	page.add_child(HSeparator.new())
+	for choice in encounter.get("choices", []):
+		var label_text := String(choice.get("label", "选择"))
+		if not String(choice.get("card_name", "")).is_empty():
+			label_text += " · %s" % choice.card_name
+		var button := _button(label_text, bool(choice.get("available", false)), Vector2(0, 48))
+		button.name = "EncounterChoice_%s" % _node_safe_id(String(choice.choice_id))
+		button.disabled = not bool(choice.get("available", false))
+		button.tooltip_text = String(choice.get("unavailable_reason", choice.get("description", ""))) if button.disabled else String(choice.get("card_description", choice.get("description", "")))
+		button.pressed.connect(_submit_encounter_choice.bind(String(choice.choice_id)))
+		page.add_child(button)
+		if encounter.get("kind", "") == "event":
+			var known_outcomes := String(choice.get("description", ""))
+			if button.disabled and not String(choice.get("unavailable_reason", "")).is_empty():
+				known_outcomes += "（不可选：%s）" % choice.unavailable_reason
+			var detail := _label("风险范围：%s" % known_outcomes if bool(choice.get("risk", false)) else known_outcomes, 13, MUTED)
+			detail.name = "EncounterChoiceDetail_%s" % _node_safe_id(String(choice.choice_id))
+			detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			page.add_child(detail)
+	if not _notice.is_empty(): page.add_child(_notice_label())
+	_set_stage(page)
+
+
 func _render_combat() -> void:
-	phase_label.text = "攻取河源县  /  遭遇战"
+	var expedition: Dictionary = _flow.expedition_run_snapshot()
+	phase_label.text = "%s  /  遭遇战" % expedition.destination_name
 	save_status.text = "战斗检查点已保存"
 	var screen = CombatScene.instantiate()
 	screen.name = "IntegratedCombat"
@@ -728,7 +816,7 @@ func _render_settlement() -> void:
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.add_theme_constant_override("separation", 18)
 	var success: bool = expedition.status == "awaiting_settlement"
-	var title := _label("河源县克复" if success else ("撤军归营" if expedition.status == "retreated" else "军势受挫"), 46, SUCCESS if success else BRONZE)
+	var title := _label("%s克复" % expedition.destination_name if success else ("撤军归营" if expedition.status == "retreated" else "军势受挫"), 46, SUCCESS if success else BRONZE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(title)
 	var outcome_label := _label(_settlement_outcome_text(expedition), 19, PARCHMENT)
@@ -742,6 +830,7 @@ func _render_settlement() -> void:
 		int(expedition.general.morale),
 		("待入库战利品：%s" % _loot_text(expedition.unbanked_loot)) if success else ("已失去战利品：%s" % _loot_text(expedition.lost_unbanked_loot)),
 	]
+	summary += "\n义军民望：%d（本次 %+d）    本次叛乱：%+d" % [int(expedition.projected_popular_support), int(expedition.pending_popular_support_delta), int(expedition.pending_rebellion_delta)]
 	var detail := _label(summary, 20, PARCHMENT)
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(detail)
@@ -799,21 +888,22 @@ func _select_general(general_id: String) -> void:
 	_render_main_city()
 
 
+func _select_expedition_target(expedition_id: String) -> void:
+	_selected_expedition_id = expedition_id
+	_deployment_counts = {}
+	_notice = ""
+	_render_deployment()
+
+
 func _deployment_general_changed(index: int, selector: OptionButton) -> void:
 	_selected_general_id = String(selector.get_item_metadata(index))
 	_deployment_counts = {}
 	_render_deployment()
 
 
-func _select_deployment_general(general_id: String) -> void:
-	_selected_general_id = general_id
-	_deployment_counts = {}
-	_render_deployment()
-
-
 func _army_count_changed(value: float, army_type: String) -> void:
 	_deployment_counts[army_type] = int(value)
-	var readiness: Dictionary = _flow.expedition_readiness({"expedition_id": EXPEDITION_ID, "general_id": _selected_general_id, "army_counts": _deployment_counts})
+	var readiness: Dictionary = _flow.expedition_readiness({"expedition_id": _selected_expedition_id, "general_id": _selected_general_id, "army_counts": _deployment_counts})
 	var total_label := find_child("DeploymentTotalLabel", true, false) as Label
 	var start_button := find_child("StartExpeditionButton", true, false) as Button
 	if total_label != null:
@@ -894,6 +984,35 @@ func _manual_save() -> void:
 	_render_main_city()
 
 
+func _submit_encounter_choice(choice_id: String) -> void:
+	var before: Dictionary = _flow.expedition_run_snapshot()
+	var result: Dictionary = _flow.submit_encounter_choice({"action_id": _action_id("encounter"), "choice_id": choice_id}, _timestamp())
+	_notice = _choice_result_notice(before, _flow.expedition_run_snapshot()) if result.ok else _result_error(result)
+	_render_current_phase()
+
+
+func _choice_result_notice(before: Dictionary, after: Dictionary) -> String:
+	if before.is_empty() or after.is_empty():
+		return "选择已结算。"
+	var changes: Array[String] = []
+	var troop_delta := int(after.get("general", {}).get("troops", 0)) - int(before.get("general", {}).get("troops", 0))
+	var morale_delta := int(after.get("general", {}).get("morale", 0)) - int(before.get("general", {}).get("morale", 0))
+	var support_delta := int(after.get("pending_popular_support_delta", 0)) - int(before.get("pending_popular_support_delta", 0))
+	var rebellion_delta := int(after.get("pending_rebellion_delta", 0)) - int(before.get("pending_rebellion_delta", 0))
+	if troop_delta != 0: changes.append("兵力 %+d" % troop_delta)
+	if morale_delta != 0: changes.append("士气 %+d" % morale_delta)
+	if support_delta != 0: changes.append("民望 %+d" % support_delta)
+	if rebellion_delta != 0: changes.append("叛乱 %+d" % rebellion_delta)
+	if after.get("status", "") == "failed": changes.append("远征失败")
+	return "选择已结算%s。" % ("：%s" % "、".join(changes) if not changes.is_empty() else "")
+
+
+func _use_temporary_item(item_instance_id: String) -> void:
+	var result: Dictionary = _flow.use_expedition_item({"action_id": _action_id("item"), "item_instance_id": item_instance_id}, _timestamp())
+	_notice = "临时物品已使用。" if result.ok else _result_error(result)
+	_render_current_phase()
+
+
 func _recover_legacy_base_loadout() -> void:
 	var result: Dictionary = _flow.recover_legacy_base_loadout(_action_id("legacy.loadout.recovery"), _timestamp())
 	if not result.ok:
@@ -939,6 +1058,20 @@ func _resource_strip(campaign: Dictionary) -> Control:
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		strip.add_child(label)
 	return strip
+
+
+func _temporary_item_bar(expedition: Dictionary) -> Control:
+	var bar := HBoxContainer.new()
+	bar.name = "TemporaryItemBar"
+	bar.add_theme_constant_override("separation", 8)
+	bar.add_child(_label("临时物品 %d / 3" % expedition.get("temporary_items", []).size(), 14, MUTED))
+	for item in expedition.get("temporary_items", []):
+		var button := _button("使用 · %s" % item.get("name", item.get("item_id", "物品")), false, Vector2(150, 36))
+		button.name = "UseItem_%s" % _node_safe_id(String(item.get("instance_id", "")))
+		button.tooltip_text = String(item.get("description", ""))
+		button.pressed.connect(_use_temporary_item.bind(String(item.get("instance_id", ""))))
+		bar.add_child(button)
+	return bar
 
 
 func _button(text: String, primary: bool, minimum := Vector2(0, 42)) -> Button:
@@ -1145,7 +1278,7 @@ func _battle_result_notice(result: Dictionary) -> String:
 
 func _settlement_outcome_text(expedition: Dictionary) -> String:
 	if expedition.status == "awaiting_settlement":
-		return "严成败退，县城已开。"
+		return "%s守军败退，目标已经控制。" % expedition.destination_name
 	if expedition.status == "retreated":
 		return "武将生还，远征目标未完成。"
 	if bool(expedition.get("general_died", false)):
@@ -1157,8 +1290,8 @@ func _settlement_outcome_text(expedition: Dictionary) -> String:
 
 func _settlement_consequence_text(expedition: Dictionary) -> String:
 	if expedition.status == "awaiting_settlement":
-		return "确认后：战利品入库、伤亡扣除、武将成长、河源县归属与势力周期一次提交。"
-	var consequences: Array[String] = ["未入库战利品全部丢失", "已发生兵损永久扣除", "河源县不会取得", "势力周期不推进"]
+		return "确认后：战利品入库、伤亡扣除、武将成长、%s归属、民望、叛乱值与势力周期一次提交。" % expedition.destination_name
+	var consequences: Array[String] = ["未入库战利品全部丢失", "已发生兵损永久扣除", "%s不会取得" % expedition.destination_name, "已发生的民望与叛乱影响仍会提交", "势力周期不推进"]
 	if bool(expedition.get("general_died", false)):
 		consequences.insert(0, "%s永久死亡" % expedition.general.name)
 	elif bool(expedition.get("general_injured", false)):

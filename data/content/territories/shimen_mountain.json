@@ -1,0 +1,10 @@
+{
+  "id": "territory.shimen_mountain",
+  "name": "石门山",
+  "balance_status": "prototype_temporary",
+  "source_expedition_id": "expedition.secure_shimen_mountain",
+  "main_city_stage_on_capture": "rebel_camp",
+  "independent_city_management": false,
+  "cycle_income": {"main_resources": {"silver": 100, "food": 160, "recruits": 140}, "special_resources": {"resource.refined_iron": 4}},
+  "presentation": {"description": "控制石门山寨后提供较多兵源，不开放独立经营。"}
+}

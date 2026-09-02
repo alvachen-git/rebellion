@@ -1,0 +1,73 @@
+{
+  "id": "enemy.boss.linze_commissioner",
+  "name": "临泽监市使",
+  "balance_status": "prototype_temporary",
+  "tier": "boss",
+  "rogue_boss": true,
+  "faction_tags": [
+    "government",
+    "merchant"
+  ],
+  "troops": 1720,
+  "max_troops": 1720,
+  "morale": 86,
+  "max_morale": 100,
+  "attack": 32,
+  "defense": 36,
+  "army_composition": {
+    "infantry": 0.5,
+    "archer": 0.35,
+    "cavalry": 0.15
+  },
+  "skills": [
+    {
+      "id": "enemy.linze.hired_blades",
+      "name": "重金募勇",
+      "intent_type": "attack",
+      "weight": 4,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "DealDamage",
+          "base_power": 80,
+          "target": "opponent"
+        }
+      ]
+    },
+    {
+      "id": "enemy.linze.cart_wall",
+      "name": "货车结垒",
+      "intent_type": "defend",
+      "weight": 3,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "GainArmor",
+          "amount": 100,
+          "target": "self"
+        }
+      ]
+    },
+    {
+      "id": "enemy.linze.price_of_fear",
+      "name": "悬赏动摇",
+      "intent_type": "disrupt",
+      "weight": 2,
+      "cooldown": 2,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "ModifyMorale",
+          "amount": -15,
+          "target": "opponent"
+        }
+      ]
+    }
+  ],
+  "boss_modifier_rules": {},
+  "presentation": {
+    "description": "勾连官府与商会的监市使，以税银供养私兵垄断临泽。"
+  }
+}

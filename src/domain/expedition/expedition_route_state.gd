@@ -29,7 +29,8 @@ func setup(generated_map: Dictionary) -> PackedStringArray:
 	for node in _map.get("nodes", []):
 		if bool(node.get("always_revealed", false)):
 			_revealed[node.id] = true
-	_reveal_outgoing(entry_id)
+	if not _uses_category_visibility():
+		_reveal_outgoing(entry_id)
 	return PackedStringArray()
 
 
@@ -110,7 +111,7 @@ func complete_current_node() -> Dictionary:
 	_completed[_current_node_id] = true
 	if _current_node_id == _map.get("boss_node_id", ""):
 		_status = "completed"
-	else:
+	elif not _uses_category_visibility():
 		_reveal_outgoing(_current_node_id)
 	return {"ok": true, "node_id": _current_node_id, "reason": ""}
 
@@ -136,6 +137,20 @@ func reveal_node(node_id: String) -> Dictionary:
 	return {"ok": true, "node_id": node_id, "reason": ""}
 
 
+func reveal_future_layers(layer_count: int) -> Dictionary:
+	if layer_count <= 0:
+		return _failure("揭示层数必须为正数")
+	var current: Dictionary = current_node()
+	var current_layer := int(current.get("layer", current.get("column", 0)))
+	var revealed_ids: Array = []
+	for node in _map.get("nodes", []):
+		var layer := int(node.get("layer", node.get("column", 0)))
+		if layer > current_layer and layer <= current_layer + layer_count:
+			_revealed[node.id] = true
+			revealed_ids.append(node.id)
+	return {"ok": true, "revealed_node_ids": revealed_ids, "reason": ""}
+
+
 func status() -> String:
 	return _status
 
@@ -144,14 +159,27 @@ func visible_nodes() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for source_node in _map.get("nodes", []):
 		var node: Dictionary = source_node.duplicate(true)
-		var is_revealed := bool(_revealed.get(node.id, false)) or not bool(node.get("fogged", true))
-		node.is_revealed = is_revealed
-		if not is_revealed:
+		var detail_revealed := bool(_revealed.get(node.id, false)) or not bool(node.get("fogged", true))
+		if _uses_category_visibility():
+			node.is_revealed = true
+			node.is_detail_revealed = detail_revealed
+			if not detail_revealed:
+				node.name = _category_name(node)
+				node.presentation = {"description": "路线类别已探明，具体内容尚待抵达或侦察。"}
+				node.erase("enemy_id")
+				node.erase("encounter_id")
+				node.erase("merchant_guard_id")
+		elif not detail_revealed:
+			node.is_revealed = false
+			node.is_detail_revealed = false
 			node.name = "未知节点"
 			node.node_type = "unknown"
 			node.presentation = {"description": "尚未获得此处情报。"}
 			node.erase("enemy_id")
 			node.erase("objective_id")
+		else:
+			node.is_revealed = true
+			node.is_detail_revealed = true
 		result.append(node)
 	return result
 
@@ -176,6 +204,26 @@ func snapshot() -> Dictionary:
 func _reveal_outgoing(node_id: String) -> void:
 	for next_id in _map.get("outgoing", {}).get(node_id, []):
 		_revealed[next_id] = true
+
+
+func _uses_category_visibility() -> bool:
+	return int(_map.get("generator_version", 1)) >= 3
+
+
+func _category_name(node: Dictionary) -> String:
+	var node_type := String(node.get("node_type", "unknown"))
+	if node_type == "normal_combat":
+		return "官兵阻路" if node.get("enemy_faction", "") == "government" else "土匪阻路"
+	return {
+		"elite_combat": "精英强敌",
+		"event": "途中事件",
+		"merchant": "过路商队",
+		"supply": "临时补给",
+		"item": "临时物品",
+		"card_reward": "军略奖励",
+		"boss": "最终决战",
+		"start": "义军营地",
+	}.get(node_type, "未知节点")
 
 
 func _failure(reason: String) -> Dictionary:

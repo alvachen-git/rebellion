@@ -1,0 +1,56 @@
+{
+  "id": "enemy.bandit.archer",
+  "name": "弓寨哨兵",
+  "balance_status": "prototype_temporary",
+  "tier": "normal",
+  "faction_tags": [
+    "bandit"
+  ],
+  "troops": 620,
+  "max_troops": 620,
+  "morale": 72,
+  "max_morale": 100,
+  "attack": 25,
+  "defense": 12,
+  "army_composition": {
+    "infantry": 0.25,
+    "archer": 0.7,
+    "cavalry": 0.05
+  },
+  "skills": [
+    {
+      "id": "enemy.bandit.archer.volley",
+      "name": "林间乱射",
+      "intent_type": "attack",
+      "weight": 4,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "RepeatAttack",
+          "base_power": 26,
+          "times": 2,
+          "target": "opponent"
+        }
+      ]
+    },
+    {
+      "id": "enemy.bandit.archer.hide",
+      "name": "借林藏身",
+      "intent_type": "defend",
+      "weight": 2,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "GainArmor",
+          "amount": 45,
+          "target": "self"
+        }
+      ]
+    }
+  ],
+  "presentation": {
+    "description": "熟悉山林地形的弓手，擅长连续射击。"
+  }
+}
