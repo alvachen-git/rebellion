@@ -9,7 +9,9 @@ const MANUAL_SAVE_CONTEXTS := {
 }
 const AUTOSAVE_EVENTS := {
 	"new_campaign": true,
+	"combat_checkpoint_created": true,
 	"expedition_node_settled": true,
+	"expedition_terminal_checkpoint": true,
 	"expedition_final_settled": true,
 }
 

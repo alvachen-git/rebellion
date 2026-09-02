@@ -2,6 +2,7 @@ extends SceneTree
 
 const ContentRegistryScript := preload("res://src/domain/content/content_registry.gd")
 const CombatScene := preload("res://src/ui/combat/combat_screen.tscn")
+const CombatantStageViewScript := preload("res://src/ui/components/combatant_stage_view.gd")
 
 var _passed := 0
 var _failed := 0
@@ -16,6 +17,7 @@ func _run_all() -> void:
 	_registry = ContentRegistryScript.new()
 	_assert_true(_registry.load_all(), "M2 content registry loads")
 	await _test_default_layout_and_labels()
+	await _test_combatant_template_routing()
 	await _test_card_click_updates_shared_combat_state()
 	await _test_card_hover_affordance()
 	await _test_unavailable_card_explains_reason()
@@ -32,12 +34,46 @@ func _run_all() -> void:
 func _test_default_layout_and_labels() -> void:
 	var screen = await _create_screen(_request(_standard_deck(), 1600))
 	_assert_true(screen.has_node("Page/Battlefield/IntentPanel"), "battlefield exposes a dedicated intent panel")
+	_assert_true(screen.has_node("Page/Battlefield/PlayerCombatant"), "battlefield gives the player a dedicated image stage")
+	_assert_true(screen.has_node("Page/Battlefield/EnemyCombatant"), "battlefield gives the enemy a dedicated image stage")
 	_assert_true(screen.has_node("Page/Command/Stack/HandScroll"), "hand is the primary card-based interaction")
 	_assert_equal(screen.card_button_count(), 5, "opening hand renders five card buttons")
 	_assert_true("第 1 回合" in screen.get_node("%TurnLabel").text, "turn label is visible")
 	_assert_true(not screen.get_node("%IntentLabel").text.is_empty(), "enemy intent text is visible")
 	_assert_true("3 / 3" in screen.get_node("%ActionLabel").text, "action point budget is visible")
+	_assert_true("兵力" in screen.get_node("%PlayerCombatant").persistent_status_text(), "player troops stay visible below the portrait")
+	_assert_true("士气" in screen.get_node("%EnemyCombatant").persistent_status_text(), "enemy morale stays visible below the portrait")
+	_assert_true(not screen.get_node("%PlayerCombatant").details_visible(), "secondary player stats start collapsed")
+	_assert_true(not screen.get_node("%EnemyCombatant").details_visible(), "secondary enemy stats start collapsed")
+	var player_portrait := screen.get_node("%PlayerCombatant").find_child("PortraitButton", true, false) as Button
+	player_portrait.mouse_entered.emit()
+	_assert_true(screen.get_node("%PlayerCombatant").details_visible(), "hovering the player image expands detailed stats")
+	_assert_true("护甲" in screen.get_node("%PlayerCombatant").detailed_status_text(), "hover detail includes armor")
+	_assert_true("攻击" in screen.get_node("%PlayerCombatant").detailed_status_text(), "hover detail includes attack")
+	_assert_true("兵种" in screen.get_node("%PlayerCombatant").detailed_status_text(), "hover detail includes army composition")
+	player_portrait.mouse_exited.emit()
+	_assert_true(not screen.get_node("%PlayerCombatant").details_visible(), "leaving the player image collapses detailed stats")
 	await _destroy_screen(screen)
+
+
+func _test_combatant_template_routing() -> void:
+	var cases := [
+		{"id": "general.zhou_jing", "side": CombatantStageViewScript.Side.PLAYER, "composition": {"infantry": 0.75, "archer": 0.15, "cavalry": 0.10}, "expected": "combatant.rebel.infantry"},
+		{"id": "general.han_yue", "side": CombatantStageViewScript.Side.PLAYER, "composition": {"infantry": 0.25, "archer": 0.65, "cavalry": 0.10}, "expected": "combatant.rebel.archer"},
+		{"id": "general.zhao_lie", "side": CombatantStageViewScript.Side.PLAYER, "composition": {"infantry": 0.20, "archer": 0.10, "cavalry": 0.70}, "expected": "combatant.rebel.cavalry"},
+		{"id": "enemy.normal.city_defenders", "side": CombatantStageViewScript.Side.ENEMY, "composition": {"infantry": 0.85, "archer": 0.15, "cavalry": 0.0}, "expected": "combatant.government.infantry"},
+		{"id": "enemy.normal.crossbow_company", "side": CombatantStageViewScript.Side.ENEMY, "composition": {"infantry": 0.20, "archer": 0.80, "cavalry": 0.0}, "expected": "combatant.government.archer"},
+		{"id": "enemy.elite.he_wei", "side": CombatantStageViewScript.Side.ENEMY, "composition": {"infantry": 0.90, "archer": 0.0, "cavalry": 0.10}, "expected": "combatant.government.heavy"},
+		{"id": "enemy.boss.yan_cheng", "side": CombatantStageViewScript.Side.ENEMY, "composition": {"infantry": 0.75, "archer": 0.25, "cavalry": 0.0}, "expected": "combatant.government.heavy"},
+	]
+	for case in cases:
+		var view = CombatantStageViewScript.new()
+		view.configure({"id": case.id, "name": case.id, "army_composition": case.composition}, case.side)
+		root.add_child(view)
+		await process_frame
+		_assert_equal(view.presentation_asset_id(), case.expected, "%s routes to its dominant battlefield template" % case.id)
+		view.queue_free()
+		await process_frame
 
 
 func _test_card_click_updates_shared_combat_state() -> void:
@@ -142,8 +178,8 @@ func _test_m3_playable_selection_rebuilds_battle() -> void:
 	_assert_equal(state.enemy.id, "enemy.elite.he_wei", "battle selection starts against He Wei")
 	_assert_equal(state.enemy.armor, 180, "selected He Wei battle carries initial black armor")
 	_assert_equal(state.seed, 10, "selected Build uses its deterministic preview seed")
-	_assert_true("周靖" in screen.get_node("%PlayerName").text, "battlefield updates the selected general name")
-	_assert_true("贺巍" in screen.get_node("%EnemyName").text, "battlefield updates the selected enemy name")
+	_assert_true("周靖" in screen.get_node("%PlayerCombatant").display_name_text(), "battlefield updates the selected general name")
+	_assert_true("贺巍" in screen.get_node("%EnemyCombatant").display_name_text(), "battlefield updates the selected enemy name")
 	_assert_equal(screen.card_button_count(), 5, "selected Build deals a five-card opening hand")
 	enemy_selector.select(7)
 	enemy_selector.item_selected.emit(7)
@@ -153,7 +189,7 @@ func _test_m3_playable_selection_rebuilds_battle() -> void:
 	state = screen.combat_snapshot()
 	_assert_equal(state.enemy.id, "enemy.boss.yan_cheng", "battle selection can start against Yan Cheng")
 	_assert_equal(state.enemy.troops, 1750, "selected Yan Cheng battle carries full boss troops")
-	_assert_true("严成" in screen.get_node("%EnemyName").text, "battlefield updates the boss name")
+	_assert_true("严成" in screen.get_node("%EnemyCombatant").display_name_text(), "battlefield updates the boss name")
 	await _destroy_screen(screen)
 
 

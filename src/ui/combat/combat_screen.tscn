@@ -1,76 +1,8 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource path="res://src/ui/combat/combat_screen.gd" type="Script" id="1_screen"]
 [ext_resource path="res://src/ui/combat/battlefield_backdrop.gd" type="Script" id="2_backdrop"]
-
-[sub_resource type="StyleBoxFlat" id="PanelTop"]
-bg_color = Color(0.055, 0.058, 0.052, 0.94)
-border_width_bottom = 1
-border_color = Color(0.72, 0.55, 0.27, 0.55)
-content_margin_left = 20.0
-content_margin_top = 10.0
-content_margin_right = 20.0
-content_margin_bottom = 10.0
-
-[sub_resource type="StyleBoxFlat" id="PanelEnemy"]
-bg_color = Color(0.18, 0.09, 0.075, 0.9)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.58, 0.29, 0.24, 0.8)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-content_margin_left = 18.0
-content_margin_top = 14.0
-content_margin_right = 18.0
-content_margin_bottom = 14.0
-
-[sub_resource type="StyleBoxFlat" id="PanelPlayer"]
-bg_color = Color(0.075, 0.16, 0.135, 0.92)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.33, 0.55, 0.47, 0.85)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-content_margin_left = 18.0
-content_margin_top = 14.0
-content_margin_right = 18.0
-content_margin_bottom = 14.0
-
-[sub_resource type="StyleBoxFlat" id="PanelIntent"]
-bg_color = Color(0.12, 0.105, 0.075, 0.96)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.78, 0.59, 0.3, 0.8)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
-content_margin_left = 16.0
-content_margin_top = 10.0
-content_margin_right = 16.0
-content_margin_bottom = 10.0
-
-[sub_resource type="StyleBoxFlat" id="ButtonPrimary"]
-bg_color = Color(0.52, 0.32, 0.13, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.85, 0.68, 0.38, 1)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
+[ext_resource path="res://src/ui/components/combatant_stage_view.gd" type="Script" id="3_combatant"]
 
 [node name="CombatScreen" type="Control"]
 layout_mode = 3
@@ -88,7 +20,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.035, 0.039, 0.034, 1)
 
 [node name="Page" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -102,7 +33,6 @@ theme_override_constants/separation = 0
 [node name="TopBar" type="PanelContainer" parent="Page"]
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
-theme_override_styles/panel = SubResource("PanelTop")
 
 [node name="Row" type="HBoxContainer" parent="Page/TopBar"]
 layout_mode = 2
@@ -110,14 +40,12 @@ layout_mode = 2
 [node name="Brand" type="Label" parent="Page/TopBar/Row"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.86, 0.72, 0.46, 1)
 theme_override_font_sizes/font_size = 24
 text = "义军战阵"
 
 [node name="TurnLabel" type="Label" parent="Page/TopBar/Row"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.85, 0.73, 1)
 theme_override_font_sizes/font_size = 18
 text = "第 1 回合"
 
@@ -128,14 +56,12 @@ layout_mode = 2
 [node name="SeedLabel" type="Label" parent="Page/TopBar/Row"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.49, 0.49, 0.45, 1)
 theme_override_font_sizes/font_size = 13
 text = "SEED"
 
 [node name="SetupBar" type="PanelContainer" parent="Page"]
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
-theme_override_styles/panel = SubResource("PanelTop")
 
 [node name="Row" type="HBoxContainer" parent="Page/SetupBar"]
 layout_mode = 2
@@ -143,7 +69,6 @@ theme_override_constants/separation = 12
 
 [node name="OrderLabel" type="Label" parent="Page/SetupBar/Row"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.59, 0.3, 1)
 theme_override_font_sizes/font_size = 15
 text = "战前军令"
 
@@ -156,7 +81,6 @@ tooltip_text = "选择首轮试玩 Build"
 
 [node name="VersusLabel" type="Label" parent="Page/SetupBar/Row"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.49, 0.49, 0.45, 1)
 text = "迎战"
 
 [node name="EnemySelector" type="OptionButton" parent="Page/SetupBar/Row"]
@@ -170,7 +94,6 @@ tooltip_text = "选择五种普通敌人或两名精英"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.61, 0.6, 0.55, 1)
 theme_override_font_sizes/font_size = 13
 text = "选择 Build 与敌情"
 text_overrun_behavior = 3
@@ -180,9 +103,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(144, 40)
 layout_mode = 2
 focus_mode = 2
-theme_override_colors/font_color = Color(1, 0.93, 0.77, 1)
 theme_override_font_sizes/font_size = 16
-theme_override_styles/normal = SubResource("ButtonPrimary")
 text = "按军令开战"
 tooltip_text = "以所选武将、敌军与固定 Seed 重开对局"
 
@@ -211,85 +132,36 @@ offset_top = 20.0
 offset_right = 150.0
 offset_bottom = 76.0
 grow_horizontal = 2
-theme_override_styles/panel = SubResource("PanelIntent")
 
 [node name="IntentLabel" type="Label" parent="Page/Battlefield/IntentPanel"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.78, 0.49, 1)
 theme_override_font_sizes/font_size = 20
 text = "⚔ 强攻"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="EnemyPanel" type="PanelContainer" parent="Page/Battlefield"]
+[node name="EnemyCombatant" type="Control" parent="Page/Battlefield"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -390.0
-offset_top = 98.0
-offset_right = -40.0
-offset_bottom = 224.0
+offset_left = -340.0
+offset_top = 64.0
+offset_right = -70.0
+offset_bottom = 360.0
 grow_horizontal = 0
-theme_override_styles/panel = SubResource("PanelEnemy")
+script = ExtResource("3_combatant")
 
-[node name="Info" type="VBoxContainer" parent="Page/Battlefield/EnemyPanel"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="EnemyName" type="Label" parent="Page/Battlefield/EnemyPanel/Info"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.79, 0.68, 1)
-theme_override_font_sizes/font_size = 21
-text = "严阵以待 · 基准官军"
-
-[node name="EnemyStats" type="Label" parent="Page/Battlefield/EnemyPanel/Info"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.84, 0.79, 0.72, 1)
-theme_override_font_sizes/font_size = 16
-text = "兵力 600/600    士气 60/100    护甲 0\n攻击 20    防御 20"
-
-[node name="PlayerPanel" type="PanelContainer" parent="Page/Battlefield"]
+[node name="PlayerCombatant" type="Control" parent="Page/Battlefield"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 40.0
-offset_top = -156.0
-offset_right = 410.0
-offset_bottom = -24.0
-grow_vertical = 0
-theme_override_styles/panel = SubResource("PanelPlayer")
-
-[node name="Info" type="VBoxContainer" parent="Page/Battlefield/PlayerPanel"]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="PlayerName" type="Label" parent="Page/Battlefield/PlayerPanel/Info"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.76, 0.92, 0.82, 1)
-theme_override_font_sizes/font_size = 21
-text = "率军武将 · 赵烈（原型）"
-
-[node name="PlayerStats" type="Label" parent="Page/Battlefield/PlayerPanel/Info"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.84, 0.78, 1)
-theme_override_font_sizes/font_size = 16
-text = "兵力 1000/1000    士气 85/100    护甲 0\n攻击 25    防御 20"
-
-[node name="ArmyLabel" type="Label" parent="Page/Battlefield/PlayerPanel/Info"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.57, 0.72, 0.64, 1)
-theme_override_font_sizes/font_size = 14
-text = "步 35%  ·  弓 15%  ·  骑 50%"
+offset_left = 70.0
+offset_top = 64.0
+offset_right = 340.0
+offset_bottom = 360.0
+script = ExtResource("3_combatant")
 
 [node name="ImpactLabel" type="Label" parent="Page/Battlefield"]
 unique_name_in_owner = true
@@ -304,8 +176,6 @@ offset_top = -18.0
 offset_bottom = 26.0
 grow_horizontal = 2
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.9, 0.38, 0.31, 1)
-theme_override_colors/font_outline_color = Color(0.08, 0.04, 0.03, 0.95)
 theme_override_constants/outline_size = 7
 theme_override_font_sizes/font_size = 28
 text = "兵力 -45"
@@ -332,7 +202,6 @@ theme_override_constants/separation = 14
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.76, 0.42, 1)
 theme_override_font_sizes/font_size = 20
 text = "3 / 3 行动力"
 
@@ -340,7 +209,6 @@ text = "3 / 3 行动力"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.62, 0.61, 0.57, 1)
 theme_override_font_sizes/font_size = 15
 text = "观察敌方意图，安排本回合出牌顺序。"
 text_overrun_behavior = 3
@@ -349,16 +217,13 @@ text_overrun_behavior = 3
 unique_name_in_owner = true
 custom_minimum_size = Vector2(104, 40)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.82, 0.69, 0.61, 1)
 text = "撤军"
 
 [node name="EndTurnButton" type="Button" parent="Page/Command/Stack/StatusRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(132, 40)
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.93, 0.77, 1)
 theme_override_font_sizes/font_size = 17
-theme_override_styles/normal = SubResource("ButtonPrimary")
 text = "结束回合"
 
 [node name="HandScroll" type="ScrollContainer" parent="Page/Command/Stack"]
@@ -393,7 +258,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.02, 0.022, 0.02, 0.9)
 
 [node name="Center" type="CenterContainer" parent="ResultOverlay"]
 layout_mode = 1
@@ -419,7 +283,6 @@ horizontal_alignment = 1
 [node name="ResultDetail" type="Label" parent="ResultOverlay/Center/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.82, 0.78, 0.68, 1)
 theme_override_font_sizes/font_size = 20
 text = "历经 1 回合"
 horizontal_alignment = 1
@@ -428,5 +291,4 @@ horizontal_alignment = 1
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
-theme_override_styles/normal = SubResource("ButtonPrimary")
 text = "重新开始原型战"

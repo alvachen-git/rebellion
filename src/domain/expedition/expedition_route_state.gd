@@ -33,6 +33,60 @@ func setup(generated_map: Dictionary) -> PackedStringArray:
 	return PackedStringArray()
 
 
+func restore(generated_map: Dictionary, saved: Dictionary) -> PackedStringArray:
+	var errors := setup(generated_map)
+	if not errors.is_empty():
+		return errors
+	for field in ["expedition_id", "seed", "current_node_id", "visited_node_ids", "completed_node_ids", "revealed_node_ids", "status"]:
+		if not saved.has(field):
+			errors.append("expedition route restore missing field '%s'" % field)
+	if not errors.is_empty():
+		return errors
+	if saved.expedition_id != generated_map.expedition_id or int(saved.seed) != int(generated_map.seed):
+		errors.append("expedition route restore identity or seed mismatch")
+	var valid_ids: Dictionary = generated_map.node_by_id
+	for field in ["visited_node_ids", "completed_node_ids", "revealed_node_ids"]:
+		if not saved[field] is Array:
+			errors.append("expedition route restore %s must be an array" % field)
+			continue
+		for node_id in saved[field]:
+			if not valid_ids.has(node_id):
+				errors.append("expedition route restore references unknown node '%s'" % node_id)
+	if not valid_ids.has(saved.current_node_id):
+		errors.append("expedition route restore current node is unknown")
+	if not saved.status in ["active", "completed"]:
+		errors.append("expedition route restore status is invalid")
+	if errors.is_empty():
+		_current_node_id = saved.current_node_id
+		_visited.assign(saved.visited_node_ids)
+		_completed = {}
+		for node_id in saved.completed_node_ids:
+			_completed[node_id] = true
+		_revealed = {}
+		for node_id in saved.revealed_node_ids:
+			_revealed[node_id] = true
+		_status = saved.status
+		if _visited.is_empty() or _visited[0] != generated_map.entry_node_id or not _visited.has(_current_node_id):
+			errors.append("expedition route restore visited path is inconsistent")
+		elif _has_duplicates(_visited):
+			errors.append("expedition route restore visited path contains duplicates")
+		else:
+			for index in range(1, _visited.size()):
+				if not generated_map.outgoing.get(_visited[index - 1], []).has(_visited[index]):
+					errors.append("expedition route restore visited path contains a disconnected step")
+					break
+		for node_id in _completed:
+			if not _visited.has(node_id):
+				errors.append("expedition route restore completed node was never visited")
+		if _status == "completed" and _current_node_id != generated_map.boss_node_id:
+			errors.append("expedition route restore completed status requires boss node")
+		elif _status == "active" and _current_node_id == generated_map.boss_node_id and bool(_completed.get(_current_node_id, false)):
+			errors.append("expedition route restore completed boss cannot remain active")
+		if saved.has("available_next_node_ids") and saved.available_next_node_ids != available_next_node_ids():
+			errors.append("expedition route restore available nodes do not match regenerated map state")
+	return errors
+
+
 func advance_to(node_id: String) -> Dictionary:
 	if _status != "active":
 		return _failure("当前远征路线不可继续推进")
@@ -126,3 +180,12 @@ func _reveal_outgoing(node_id: String) -> void:
 
 func _failure(reason: String) -> Dictionary:
 	return {"ok": false, "reason": reason}
+
+
+func _has_duplicates(values: Array[String]) -> bool:
+	var seen := {}
+	for value in values:
+		if seen.has(value):
+			return true
+		seen[value] = true
+	return false

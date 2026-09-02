@@ -1,0 +1,33 @@
+{
+  "id": "config.prototype.heyuan_encounters.v1",
+  "balance_status": "prototype_temporary",
+  "expedition_id": "expedition.capture_heyuan_county",
+  "battle_seed_salt": 1213547348,
+  "normal_enemy_pools": {
+    "official_road": ["enemy.normal.city_defenders", "enemy.normal.crossbow_company", "enemy.normal.patrol_inspector"],
+    "village_path": ["enemy.normal.local_militia", "enemy.normal.patrol_inspector", "enemy.normal.overseer_unit"],
+    "grain_route": ["enemy.normal.overseer_unit", "enemy.normal.crossbow_company", "enemy.normal.local_militia"]
+  },
+  "objective_enemies": {
+    "heyuan.official.armory": "enemy.normal.city_defenders",
+    "heyuan.village.beacon": "enemy.normal.patrol_inspector",
+    "heyuan.grain.granary": "enemy.normal.overseer_unit"
+  },
+  "elite_enemy_pool": ["enemy.elite.gao_wu", "enemy.elite.he_wei"],
+  "wealth_enemy_pool": ["enemy.normal.city_defenders", "enemy.normal.crossbow_company", "enemy.normal.overseer_unit"],
+  "victory_rewards": {
+    "normal_combat": {"resource.silver": 25, "resource.food": 20},
+    "military_objective": {"resource.military_knowledge": 20},
+    "elite_combat": {"resource.silver": 30, "resource.military_knowledge": 35},
+    "wealth_risk": {"resource.silver": 160, "resource.military_knowledge": 25},
+    "boss": {"resource.silver": 100, "resource.food": 120, "resource.recruits": 60, "resource.military_knowledge": 80, "resource.cavalry_fragment": 1}
+  },
+  "noncombat_effects": {
+    "official_road:event": {"buff": {"type": "ModifyNextBattleAttack", "amount": 4}},
+    "village_path:event": {"buff": {"type": "ModifyNextBattleMorale", "amount": 10}},
+    "official_road:loot": {"loot": {"resource.silver": 80}},
+    "grain_route:loot": {"loot": {"resource.food": 100}},
+    "supply": {"restore_troops_ratio": 0.15, "restore_morale": 20},
+    "intel": {"intel": {"boss_profile_revealed": true}}
+  }
+}

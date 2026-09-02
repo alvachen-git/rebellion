@@ -1,0 +1,13 @@
+{
+  "id": "config.prototype.deployment_rules.v1",
+  "balance_status": "prototype_temporary",
+  "base_deck_min_size": 15,
+  "base_deck_max_size": 25,
+  "attribute_delta_conversions": {
+    "martial_attack_per_point": 1.0,
+    "leadership_defense_per_point": 0.5,
+    "leadership_troop_cap_per_point": 25,
+    "administration_combat_effect": 0
+  },
+  "morale_source": "static_general_definition"
+}

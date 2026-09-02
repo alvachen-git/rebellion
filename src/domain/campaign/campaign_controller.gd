@@ -6,6 +6,7 @@ const ArmyManagementServiceScript := preload("res://src/domain/campaign/army_man
 const ResearchManagementServiceScript := preload("res://src/domain/campaign/research_management_service.gd")
 const GeneralManagementServiceScript := preload("res://src/domain/campaign/general_management_service.gd")
 const FactionCycleServiceScript := preload("res://src/domain/campaign/faction_cycle_service.gd")
+const LoadoutServiceScript := preload("res://src/domain/campaign/loadout_service.gd")
 
 const RESOURCE_KEY_BY_LOOT_ID := {
 	"resource.silver": "silver",
@@ -23,6 +24,10 @@ var _general_definitions: Dictionary = {}
 var _faction_cycle: Dictionary = {}
 var _territory_definitions: Dictionary = {}
 var _territory_by_expedition: Dictionary = {}
+var _loadout_cards: Dictionary = {}
+var _loadout_card_order: Array[String] = []
+var _base_loadout_min_size := 15
+var _base_loadout_max_size := 25
 
 
 func setup(campaign_source: Dictionary) -> PackedStringArray:
@@ -97,6 +102,103 @@ func apply_expedition_settlement(request: Dictionary) -> Dictionary:
 
 func snapshot() -> Dictionary:
 	return _state.duplicate(true)
+
+
+func configure_loadouts(card_definitions: Array, minimum_size: int = 15, maximum_size: int = 25) -> PackedStringArray:
+	_loadout_cards = {}
+	_loadout_card_order = []
+	_base_loadout_min_size = minimum_size
+	_base_loadout_max_size = maximum_size
+	var errors := PackedStringArray()
+	if minimum_size <= 0 or maximum_size < minimum_size:
+		errors.append("loadout: base deck size range is invalid")
+	for card in card_definitions:
+		if not card is Dictionary:
+			errors.append("loadout: card catalog entries must be objects")
+			continue
+		var card_id := String(card.get("id", ""))
+		if card_id.is_empty() or _loadout_cards.has(card_id):
+			errors.append("loadout: card catalog ids must be non-empty and unique")
+		else:
+			_loadout_cards[card_id] = card.duplicate(true)
+			_loadout_card_order.append(card_id)
+	if errors.is_empty() and not bool(_state.get("loadout_system", {}).get("requires_legacy_recovery", false)):
+		errors.append_array(LoadoutServiceScript.validate_base_loadout(_state.get("base_loadout", null), _state, _loadout_cards, minimum_size, maximum_size))
+	if not errors.is_empty():
+		_loadout_cards = {}
+		_loadout_card_order = []
+	return errors
+
+
+func set_base_loadout(request: Dictionary) -> Dictionary:
+	if _state.is_empty():
+		return _loadout_failure("campaign: controller is not initialized")
+	if _loadout_cards.is_empty():
+		return _loadout_failure("campaign: loadout catalog is not configured")
+	for field in ["action_id", "cards"]:
+		if not request.has(field):
+			return _loadout_failure("base loadout: missing field '%s'" % field)
+	if not request.action_id is String or request.action_id.strip_edges().is_empty():
+		return _loadout_failure("base loadout: action_id must be a non-empty string")
+	if _state.loadout_system.applied_action_ids.has(request.action_id):
+		return {"ok": true, "duplicate": true, "errors": PackedStringArray(), "cards": []}
+	if bool(_state.loadout_system.get("requires_legacy_recovery", false)):
+		return _loadout_failure("base loadout: requires_legacy_loadout_recovery")
+	var errors := LoadoutServiceScript.validate_base_loadout(request.cards, _state, _loadout_cards, _base_loadout_min_size, _base_loadout_max_size)
+	if not errors.is_empty():
+		return {"ok": false, "duplicate": false, "errors": errors, "cards": []}
+	var next_state := _state.duplicate(true)
+	next_state.base_loadout = request.cards.duplicate()
+	next_state.loadout_system.applied_action_ids.append(request.action_id)
+	next_state.loadout_system.history.append({"action_id": request.action_id, "action": "set_base_loadout", "cards": request.cards.duplicate()})
+	_state = next_state
+	return {"ok": true, "duplicate": false, "errors": PackedStringArray(), "cards": request.cards.duplicate()}
+
+
+func recover_legacy_base_loadout(request: Dictionary, starter_public_card_ids: Array, initial_base_loadout: Array) -> Dictionary:
+	if _state.is_empty():
+		return _loadout_failure("campaign: controller is not initialized")
+	for field in ["action_id", "timestamp"]:
+		if not request.has(field):
+			return _loadout_failure("loadout recovery: missing field '%s'" % field)
+	if not request.action_id is String or request.action_id.strip_edges().is_empty():
+		return _loadout_failure("loadout recovery: action_id must be a non-empty string")
+	if _state.loadout_system.applied_action_ids.has(request.action_id):
+		return {"ok": true, "duplicate": true, "errors": PackedStringArray(), "cards": []}
+	if not bool(_state.loadout_system.get("requires_legacy_recovery", false)):
+		return _loadout_failure("loadout recovery: campaign does not require recovery")
+	var next_state := _state.duplicate(true)
+	var granted_public_card_ids: Array = []
+	for card_id in starter_public_card_ids:
+		if not next_state.unlocked_public_cards.has(card_id):
+			next_state.unlocked_public_cards.append(card_id)
+			granted_public_card_ids.append(card_id)
+	var errors := LoadoutServiceScript.validate_base_loadout(initial_base_loadout, next_state, _loadout_cards, _base_loadout_min_size, _base_loadout_max_size)
+	if not errors.is_empty():
+		return {"ok": false, "duplicate": false, "errors": errors, "cards": []}
+	next_state.base_loadout = initial_base_loadout.duplicate()
+	next_state.loadout_system.requires_legacy_recovery = false
+	next_state.loadout_system.applied_action_ids.append(request.action_id)
+	var replaced_summary: Array = []
+	var legacy_general_ids: Array = next_state.loadout_system.get("legacy_general_loadouts", {}).keys()
+	legacy_general_ids.sort()
+	for general_id in legacy_general_ids:
+		var legacy_deck: Array = next_state.loadout_system.legacy_general_loadouts[general_id]
+		replaced_summary.append({
+			"general_id": general_id,
+			"card_count": legacy_deck.size(),
+			"unique_card_count": _unique_value_count(legacy_deck),
+		})
+	next_state.loadout_system.history.append({
+		"action_id": request.action_id,
+		"action": "recover_legacy_base_loadout",
+		"timestamp": request.timestamp,
+		"granted_public_card_ids": granted_public_card_ids,
+		"cards": initial_base_loadout.duplicate(),
+		"replaced_legacy_loadout_summary": replaced_summary,
+	})
+	_state = next_state
+	return {"ok": true, "duplicate": false, "errors": PackedStringArray(), "cards": granted_public_card_ids}
 
 
 func configure_army_economy(definition: Dictionary) -> PackedStringArray:
@@ -841,6 +943,13 @@ func _advance_general_recovery_in_state(state: Dictionary, action_id: String) ->
 	return {"changed_general_ids": changed_general_ids, "recovered_general_ids": recovered_general_ids}
 
 
+func _unique_value_count(values: Array) -> int:
+	var unique := {}
+	for value in values:
+		unique[value] = true
+	return unique.size()
+
+
 func _general_action_failure(error: String) -> Dictionary:
 	return {"ok": false, "duplicate": false, "errors": PackedStringArray([error]), "general": {}}
 
@@ -871,3 +980,7 @@ func _finalization_failure_from_errors(errors: PackedStringArray) -> Dictionary:
 
 func _finalization_duplicate() -> Dictionary:
 	return {"ok": true, "duplicate": true, "errors": PackedStringArray(), "game_over": _state.get("campaign_status", "") == "game_over"}
+
+
+func _loadout_failure(error: String) -> Dictionary:
+	return {"ok": false, "duplicate": false, "errors": PackedStringArray([error]), "cards": []}

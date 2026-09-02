@@ -1,0 +1,79 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource path="res://src/ui/game/game_shell.gd" type="Script" id="1_shell"]
+[ext_resource path="res://src/ui/game/campaign_backdrop.gd" type="Script" id="2_backdrop"]
+
+[node name="GameShell" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_shell")
+
+[node name="Backdrop" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_backdrop")
+
+[node name="Page" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="TopBar" type="PanelContainer" parent="Page"]
+custom_minimum_size = Vector2(0, 66)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Page/TopBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 34
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 34
+theme_override_constants/margin_bottom = 10
+
+[node name="Row" type="HBoxContainer" parent="Page/TopBar/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Brand" type="Label" parent="Page/TopBar/Margin/Row"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 25
+text = "架空王朝起义军"
+
+[node name="Rule" type="VSeparator" parent="Page/TopBar/Margin/Row"]
+layout_mode = 2
+
+[node name="PhaseLabel" type="Label" parent="Page/TopBar/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+text = "烽火初燃"
+vertical_alignment = 1
+
+[node name="SaveStatus" type="Label" parent="Page/TopBar/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "未建立战役"
+vertical_alignment = 1
+
+[node name="StageHost" type="MarginContainer" parent="Page"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 42
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 42
+theme_override_constants/margin_bottom = 30

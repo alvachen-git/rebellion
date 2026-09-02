@@ -36,6 +36,10 @@ func migrate(source: Dictionary) -> Dictionary:
 func _apply_step(version: int, source: Dictionary) -> Dictionary:
 	if version == 1:
 		return _migrate_v1_to_v2(source)
+	if version == 2:
+		return _migrate_v2_to_v3(source)
+	if version == 3:
+		return _migrate_v3_to_v4(source)
 	return _failure("save migration: no migration registered from version %d" % version)
 
 
@@ -48,6 +52,43 @@ func _migrate_v1_to_v2(source: Dictionary) -> Dictionary:
 	var result := source.duplicate(true)
 	result.campaign = CampaignStateScript.normalize(result.campaign)
 	result.save_version = 2
+	return {"ok": true, "errors": PackedStringArray(), "value": result}
+
+
+func _migrate_v2_to_v3(source: Dictionary) -> Dictionary:
+	for field in ["content_version", "created_at", "updated_at", "campaign", "expedition"]:
+		if not source.has(field):
+			return _failure("save migration v2->v3: missing field '%s'" % field)
+	if not source.campaign is Dictionary:
+		return _failure("save migration v2->v3: campaign must be an object")
+	var result := source.duplicate(true)
+	if not result.campaign.has("general_loadouts"):
+		result.campaign.general_loadouts = {}
+	if not result.campaign.has("loadout_system"):
+		result.campaign.loadout_system = {"applied_action_ids": [], "history": []}
+	result.campaign = CampaignStateScript.normalize(result.campaign)
+	result.save_version = 3
+	return {"ok": true, "errors": PackedStringArray(), "value": result}
+
+
+func _migrate_v3_to_v4(source: Dictionary) -> Dictionary:
+	for field in ["content_version", "created_at", "updated_at", "campaign", "expedition"]:
+		if not source.has(field):
+			return _failure("save migration v3->v4: missing field '%s'" % field)
+	if not source.campaign is Dictionary:
+		return _failure("save migration v3->v4: campaign must be an object")
+	var result := source.duplicate(true)
+	var legacy_loadouts := {}
+	if result.campaign.get("general_loadouts", null) is Dictionary:
+		legacy_loadouts = result.campaign.general_loadouts.duplicate(true)
+	result.campaign.erase("general_loadouts")
+	result.campaign.base_loadout = []
+	if not result.campaign.get("loadout_system", null) is Dictionary:
+		result.campaign.loadout_system = {}
+	result.campaign.loadout_system.requires_legacy_recovery = true
+	result.campaign.loadout_system.legacy_general_loadouts = legacy_loadouts
+	result.campaign = CampaignStateScript.normalize(result.campaign)
+	result.save_version = 4
 	return {"ok": true, "errors": PackedStringArray(), "value": result}
 
 
