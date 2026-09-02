@@ -90,7 +90,7 @@ func _test_shuffle_is_deterministic_and_non_mutating() -> void:
 
 func _test_save_envelope_is_valid() -> void:
 	var envelope := SaveEnvelopeScript.create_empty("campaign-test", "2026-09-01T00:00:00Z")
-	_assert_true(SaveEnvelopeScript.validate(envelope).is_empty(), "new save envelope satisfies version 2 schema")
+	_assert_true(SaveEnvelopeScript.validate(envelope).is_empty(), "new save envelope satisfies current schema")
 	_assert_equal(envelope.campaign.resources.keys().size(), 4, "campaign starts with four main resources")
 
 
@@ -136,7 +136,7 @@ func _test_save_slot_policy() -> void:
 
 func _test_main_scene_exists() -> void:
 	var main_scene: String = ProjectSettings.get_setting("application/run/main_scene", "")
-	_assert_equal(main_scene, "res://src/ui/combat/combat_screen.tscn", "combat prototype is configured as main scene")
+	_assert_equal(main_scene, "res://src/ui/game/game_shell.tscn", "Vertical Slice game shell is configured as main scene")
 	_assert_true(ResourceLoader.exists(main_scene), "configured main scene exists")
 
 

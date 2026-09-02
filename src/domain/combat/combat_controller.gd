@@ -24,6 +24,7 @@ var _state: Dictionary = {}
 var _result: Dictionary = {}
 var _active_player_card: Dictionary = {}
 var _active_card_damage_multiplier := 1.0
+var _card_overrides: Dictionary = {}
 
 
 func setup(request: Dictionary, content_registry) -> PackedStringArray:
@@ -32,6 +33,7 @@ func setup(request: Dictionary, content_registry) -> PackedStringArray:
 		return errors
 
 	_registry = content_registry
+	_card_overrides = request.get("card_overrides", {}).duplicate(true)
 	var battle_seed := int(request.get("seed", 0))
 	_deck_rng = DeterministicRngScript.new(battle_seed ^ 0x44EC5EED)
 	_ai_rng = DeterministicRngScript.new(battle_seed ^ 0xA11E57)
@@ -96,7 +98,7 @@ func play_card(hand_index: int) -> Dictionary:
 	if hand_index < 0 or hand_index >= _deck.hand.size():
 		return _failure("手牌索引无效")
 	var card_id: String = _deck.hand[hand_index]
-	var card: Dictionary = _registry.get_card(card_id)
+	var card: Dictionary = _card_definition(card_id)
 	if card.is_empty():
 		return _failure("找不到卡牌：%s" % card_id)
 	var cost := int(card.get("cost", 0))
@@ -130,7 +132,7 @@ func play_card(hand_index: int) -> Dictionary:
 func card_availability(hand_index: int) -> Dictionary:
 	if hand_index < 0 or hand_index >= _deck.hand.size():
 		return _failure("手牌索引无效")
-	var card: Dictionary = _registry.get_card(_deck.hand[hand_index])
+	var card: Dictionary = _card_definition(_deck.hand[hand_index])
 	if card.is_empty():
 		return _failure("卡牌定义缺失")
 	if int(card.get("cost", 0)) > int(_state.action_points):
@@ -147,7 +149,7 @@ func card_availability(hand_index: int) -> Dictionary:
 func preview_card_damage(hand_index: int) -> int:
 	if hand_index < 0 or hand_index >= _deck.hand.size():
 		return 0
-	var card: Dictionary = _registry.get_card(_deck.hand[hand_index])
+	var card: Dictionary = _card_definition(_deck.hand[hand_index])
 	var source: Dictionary = _state.player.duplicate(true)
 	var target: Dictionary = _state.enemy.duplicate(true)
 	_preview_pre_card_talent(card, source, target)
@@ -428,6 +430,7 @@ func _build_result(
 	game_over: bool
 ) -> Dictionary:
 	return {
+		"battle_id": _state.battle_id,
 		"status": status,
 		"reason": reason,
 		"turns": int(_state.turn),
@@ -835,8 +838,21 @@ func _validate_request(request: Dictionary, content_registry) -> PackedStringArr
 			errors.append("combat request deck must be a non-empty array")
 		else:
 			for card_id in request.deck:
-				if not card_id is String or not content_registry.has_card(card_id):
+				var overrides = request.get("card_overrides", {})
+				if not card_id is String or (not content_registry.has_card(card_id) and not (overrides is Dictionary and overrides.has(card_id))):
 					errors.append("combat request references unknown card '%s'" % str(card_id))
+	var card_overrides = request.get("card_overrides", {})
+	if not card_overrides is Dictionary:
+		errors.append("combat request card_overrides must be an object")
+	else:
+		for card_id in card_overrides:
+			var definition = card_overrides[card_id]
+			if not content_registry.has_card(card_id):
+				errors.append("combat request card override references unknown card '%s'" % card_id)
+			elif not definition is Dictionary or definition.get("id", "") != card_id:
+				errors.append("combat request card override id mismatch '%s'" % card_id)
+			else:
+				errors.append_array(content_registry.validate_card_definition(definition, "combat request card_overrides.%s" % card_id))
 	if request.has("enemy") and request.enemy is Dictionary:
 		if not request.enemy.get("skills", null) is Array or request.enemy.get("skills", []).is_empty():
 			errors.append("combat request enemy must have at least one skill")
@@ -861,6 +877,12 @@ func _validate_request(request: Dictionary, content_registry) -> PackedStringArr
 			elif content_registry.get_talent(talent_id).get("owner_general_id", "") != player_id:
 				errors.append("combat request talent '%s' does not belong to '%s'" % [talent_id, player_id])
 	return errors
+
+
+func _card_definition(card_id: String) -> Dictionary:
+	if _card_overrides.has(card_id):
+		return _card_overrides[card_id].duplicate(true)
+	return _registry.get_card(card_id)
 
 
 func _failure(reason: String) -> Dictionary:

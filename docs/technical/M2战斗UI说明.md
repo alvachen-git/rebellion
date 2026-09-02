@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-M2 最小战斗 UI 已接入 M1 CombatController，并在 M3-04 接入三套正式 Build 与八名正式敌人的战前选择入口。开发内容仍保留用于底层回归，但主场景默认使用赵烈对官军巡检。
+M2 最小战斗 UI 已接入 M1 CombatController，并在 M3-04 接入三套正式 Build 与八名正式敌人的战前选择入口。M6-01B 后主场景改为完整 `GameShell`；战斗场景保留独立选择模式用于内容回归，并增加集成模式接收远征的不可变 CombatRequest、向流程提交 CombatResult。
 
 ## 视觉与布局
 

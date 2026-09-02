@@ -25,6 +25,7 @@ func validate(envelope: Dictionary, registry: RefCounted) -> PackedStringArray:
 		_validate_card_id(String(card_id), "unlocked_public_cards", registry, errors)
 	for card_id in campaign.get("card_upgrade_branches", {}).keys():
 		_validate_card_id(String(card_id), "card_upgrade_branches", registry, errors)
+	_validate_card_ids(campaign.get("base_loadout", []), "base_loadout", registry, errors)
 	for index in campaign.get("territories", []).size():
 		var territory = campaign.territories[index]
 		if territory is Dictionary:
@@ -50,10 +51,12 @@ func validate(envelope: Dictionary, registry: RefCounted) -> PackedStringArray:
 		_validate_expedition_nodes(expedition, registry, errors)
 		_validate_expedition_actor(expedition.get("general", null), "expedition.general", roster_ids, registry, errors)
 		_validate_card_ids(expedition.get("deck", []), "expedition.deck", registry, errors)
+		_validate_card_overrides(expedition.get("card_overrides", {}), "expedition.card_overrides", registry, errors)
 		var pending_combat = expedition.get("pending_combat", null)
 		if pending_combat is Dictionary and not pending_combat.is_empty():
 			_validate_expedition_actor(pending_combat.get("player", null), "expedition.pending_combat.player", roster_ids, registry, errors)
 			_validate_card_ids(pending_combat.get("deck", []), "expedition.pending_combat.deck", registry, errors)
+			_validate_card_overrides(pending_combat.get("card_overrides", {}), "expedition.pending_combat.card_overrides", registry, errors)
 			var enemy = pending_combat.get("enemy", null)
 			if enemy is Dictionary:
 				var enemy_id := String(enemy.get("id", ""))
@@ -84,6 +87,19 @@ func _validate_card_id(card_id: String, source: String, registry: RefCounted, er
 		errors.append("save references: %s references missing card '%s'" % [source, card_id])
 
 
+func _validate_card_overrides(value: Variant, source: String, registry: RefCounted, errors: PackedStringArray) -> void:
+	if not value is Dictionary:
+		return
+	for card_id in value:
+		_validate_card_id(String(card_id), source, registry, errors)
+		var definition = value[card_id]
+		if not definition is Dictionary or String(definition.get("id", "")) != String(card_id):
+			errors.append("save references: %s override '%s' must contain the matching definition id" % [source, card_id])
+		elif registry.has_method("validate_card_definition"):
+			for error in registry.validate_card_definition(definition, "%s.%s" % [source, card_id]):
+				errors.append("save references: %s" % error)
+
+
 func _validate_talent_id(talent_id: String, source: String, registry: RefCounted, errors: PackedStringArray) -> void:
 	if not talent_id.is_empty() and not registry.has_talent(talent_id):
 		errors.append("save references: %s references missing talent '%s'" % [source, talent_id])
@@ -108,9 +124,13 @@ func _validate_expedition_nodes(expedition: Dictionary, registry: RefCounted, er
 		for field in ["visited_node_ids", "completed_node_ids", "revealed_node_ids", "available_next_node_ids"]:
 			for node_id in route.get(field, []):
 				_validate_node_id(String(node_id), "expedition.route.%s" % field, node_ids, errors)
-	for node in expedition.get("visible_nodes", []):
-		if node is Dictionary:
-			_validate_node_id(String(node.get("id", "")), "expedition.visible_nodes", node_ids, errors)
+	for index in expedition.get("resolution_history", []).size():
+		var resolution = expedition.resolution_history[index]
+		if resolution is Dictionary:
+			_validate_node_id(String(resolution.get("node_id", "")), "expedition.resolution_history[%d].node_id" % index, node_ids, errors)
+	var pending_resolution = expedition.get("pending_node_resolution", null)
+	if pending_resolution is Dictionary and not pending_resolution.is_empty():
+		_validate_node_id(String(pending_resolution.get("node_id", "")), "expedition.pending_node_resolution.node_id", node_ids, errors)
 	var pending = expedition.get("pending_combat", null)
 	if pending is Dictionary:
 		var context = pending.get("expedition_context", null)

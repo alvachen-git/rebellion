@@ -11,3 +11,4 @@ coverage/
 /outputs/
 
 # Godot generated import/cache state remains local.
+*.import

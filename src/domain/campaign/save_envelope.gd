@@ -3,8 +3,8 @@ class_name SaveEnvelope
 
 const CampaignStateScript := preload("res://src/domain/campaign/campaign_state.gd")
 
-const CURRENT_SAVE_VERSION := 2
-const CURRENT_CONTENT_VERSION := "0.4.0-m4-map"
+const CURRENT_SAVE_VERSION := 4
+const CURRENT_CONTENT_VERSION := "0.6.1-m6-deck-editor"
 
 
 static func create_empty(campaign_id: String, timestamp: String) -> Dictionary:
