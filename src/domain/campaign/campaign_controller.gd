@@ -86,8 +86,10 @@ func apply_expedition_settlement(request: Dictionary) -> Dictionary:
 		"outcome": request.outcome,
 		"army_losses": army_losses.duplicate(true),
 		"army_losses_applied": request.has("initial_troops") and request.has("army_composition"),
+		"army_loss_recovery": null,
 		"general_effect_applied": false,
 		"faction_effect_applied": false,
+		"long_term_effects_finalized": false,
 	})
 	_state = next_state
 	return {"ok": true, "duplicate": false, "errors": PackedStringArray(), "resource_changes": resource_changes}
@@ -343,6 +345,108 @@ func apply_pending_general_effect(request_id: String) -> Dictionary:
 	}
 
 
+func recover_legacy_army_losses(request_id: String) -> Dictionary:
+	if _state.is_empty():
+		return _finalization_failure("campaign: controller is not initialized")
+	if request_id.strip_edges().is_empty():
+		return _finalization_failure("legacy army recovery: request_id must be a non-empty string")
+	var effect_index := _find_pending_effect_index(request_id)
+	if effect_index < 0:
+		return _finalization_failure("legacy army recovery: unknown settlement request '%s'" % request_id)
+	var effect: Dictionary = _state.pending_long_term_effects[effect_index]
+	if bool(effect.get("army_losses_applied", false)):
+		if not effect.get("army_loss_recovery", null) is Dictionary or effect.army_loss_recovery.get("type", "") != "legacy_snapshot_unavailable":
+			return _finalization_failure("legacy army recovery: settlement already has classified army losses")
+		return {
+			"ok": true,
+			"duplicate": true,
+			"errors": PackedStringArray(),
+			"resolution": effect.get("army_loss_recovery", null),
+		}
+	var losses = effect.get("army_losses", null)
+	if not losses is Dictionary or not ArmyManagementServiceScript.validate_inventory(losses, "legacy army recovery.losses").is_empty():
+		return _finalization_failure("legacy army recovery: unresolved losses must use the normalized three-army zero placeholder")
+	for army_type in ArmyManagementServiceScript.ARMY_TYPE_IDS:
+		if int(losses[army_type]) != 0:
+			return _finalization_failure("legacy army recovery: cannot waive already classified non-zero losses")
+	var next_state := _state.duplicate(true)
+	var resolution := {
+		"type": "legacy_snapshot_unavailable",
+		"inventory_change": {"infantry": 0, "archer": 0, "cavalry": 0},
+		"reason": "pre_v2_settlement_missing_initial_troops_and_army_composition",
+	}
+	next_state.pending_long_term_effects[effect_index].army_losses_applied = true
+	next_state.pending_long_term_effects[effect_index].army_loss_recovery = resolution.duplicate(true)
+	next_state.army_history.append({
+		"action_id": request_id,
+		"action": "recover_legacy_unclassified_losses",
+		"resolution": resolution.duplicate(true),
+	})
+	var state_errors: PackedStringArray = CampaignStateScript.validate(next_state)
+	if not state_errors.is_empty():
+		return _finalization_failure_from_errors(state_errors)
+	_state = next_state
+	return {"ok": true, "duplicate": false, "errors": PackedStringArray(), "resolution": resolution}
+
+
+func finalize_pending_settlement(request_id: String) -> Dictionary:
+	if _state.is_empty():
+		return _finalization_failure("campaign: controller is not initialized")
+	if request_id.strip_edges().is_empty():
+		return _finalization_failure("settlement finalization: request_id must be a non-empty string")
+	if _state.applied_finalization_ids.has(request_id):
+		return _finalization_duplicate()
+	var effect_index := _find_pending_effect_index(request_id)
+	if effect_index < 0:
+		return _finalization_failure("settlement finalization: unknown settlement request '%s'" % request_id)
+	var effect: Dictionary = _state.pending_long_term_effects[effect_index]
+	if not bool(effect.get("army_losses_applied", false)):
+		var failure := _finalization_failure("settlement finalization: legacy army losses require explicit recovery")
+		failure.requires_legacy_army_recovery = true
+		return failure
+	var before := _state.duplicate(true)
+	var general_result := {"ok": true, "duplicate": true, "errors": PackedStringArray()}
+	if not bool(effect.get("general_effect_applied", false)):
+		general_result = apply_pending_general_effect(request_id)
+		if not general_result.ok:
+			_state = before
+			return _finalization_failure_from_errors(general_result.errors)
+	var refreshed_index := _find_pending_effect_index(request_id)
+	var refreshed_effect: Dictionary = _state.pending_long_term_effects[refreshed_index]
+	var faction_result := {"ok": true, "duplicate": true, "skipped": false, "errors": PackedStringArray()}
+	if not bool(refreshed_effect.get("faction_effect_applied", false)):
+		if _state.campaign_status == "game_over" and _state.game_over_record is Dictionary and _state.game_over_record.get("request_id", "") == request_id:
+			faction_result = _consume_faction_after_game_over(request_id, refreshed_index)
+		else:
+			faction_result = apply_pending_faction_effect(request_id)
+		if not faction_result.ok:
+			_state = before
+			return _finalization_failure_from_errors(faction_result.errors)
+	refreshed_index = _find_pending_effect_index(request_id)
+	var next_state := _state.duplicate(true)
+	next_state.pending_long_term_effects[refreshed_index].long_term_effects_finalized = true
+	next_state.applied_finalization_ids.append(request_id)
+	next_state.finalization_history.append({
+		"request_id": request_id,
+		"action": "finalize_settlement_long_term_effects",
+		"army_loss_recovery": next_state.pending_long_term_effects[refreshed_index].get("army_loss_recovery", null),
+		"campaign_status": next_state.campaign_status,
+	})
+	var state_errors: PackedStringArray = CampaignStateScript.validate(next_state)
+	if not state_errors.is_empty():
+		_state = before
+		return _finalization_failure_from_errors(state_errors)
+	_state = next_state
+	return {
+		"ok": true,
+		"duplicate": false,
+		"errors": PackedStringArray(),
+		"faction_result": faction_result,
+		"general_result": general_result,
+		"game_over": _state.campaign_status == "game_over",
+	}
+
+
 func apply_general_recovery_cycle(action_id: String) -> Dictionary:
 	if _state.is_empty():
 		return _general_action_failure("campaign: controller is not initialized")
@@ -511,6 +615,32 @@ func apply_pending_faction_effect(request_id: String) -> Dictionary:
 		"special_income": income.special_income,
 		"changed_general_ids": recovery.changed_general_ids,
 		"recovered_general_ids": recovery.recovered_general_ids,
+	}
+
+
+func _consume_faction_after_game_over(request_id: String, effect_index: int) -> Dictionary:
+	var next_state := _state.duplicate(true)
+	next_state.pending_long_term_effects[effect_index].faction_effect_applied = true
+	next_state.faction.applied_effect_ids.append(request_id)
+	next_state.faction.history.append({
+		"action_id": request_id,
+		"action": "skip_faction_cycle",
+		"expedition_id": next_state.pending_long_term_effects[effect_index].get("expedition_id", ""),
+		"outcome": next_state.pending_long_term_effects[effect_index].get("outcome", ""),
+		"reason": "campaign_game_over_from_same_settlement",
+	})
+	_state = next_state
+	return {
+		"ok": true,
+		"duplicate": false,
+		"skipped": true,
+		"errors": PackedStringArray(),
+		"cycle_advanced": 0,
+		"captured_territory_ids": [],
+		"main_income": {},
+		"special_income": {},
+		"changed_general_ids": [],
+		"recovered_general_ids": [],
 	}
 
 
@@ -729,3 +859,15 @@ func _faction_failure_from_errors(errors: PackedStringArray) -> Dictionary:
 
 func _faction_action_duplicate() -> Dictionary:
 	return {"ok": true, "duplicate": true, "skipped": false, "errors": PackedStringArray(), "cycle_advanced": 0, "captured_territory_ids": [], "main_income": {}, "special_income": {}}
+
+
+func _finalization_failure(error: String) -> Dictionary:
+	return {"ok": false, "duplicate": false, "errors": PackedStringArray([error]), "requires_legacy_army_recovery": false}
+
+
+func _finalization_failure_from_errors(errors: PackedStringArray) -> Dictionary:
+	return {"ok": false, "duplicate": false, "errors": errors, "requires_legacy_army_recovery": false}
+
+
+func _finalization_duplicate() -> Dictionary:
+	return {"ok": true, "duplicate": true, "errors": PackedStringArray(), "game_over": _state.get("campaign_status", "") == "game_over"}

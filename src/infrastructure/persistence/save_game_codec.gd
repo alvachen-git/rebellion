@@ -2,6 +2,7 @@ extends RefCounted
 class_name SaveGameCodec
 
 const SaveEnvelopeScript := preload("res://src/domain/campaign/save_envelope.gd")
+const SaveMigrationRegistryScript := preload("res://src/infrastructure/persistence/save_migration_registry.gd")
 
 
 func encode(envelope: Dictionary) -> Dictionary:
@@ -24,7 +25,16 @@ func decode(text: String) -> Dictionary:
 	var value = json.data
 	if not value is Dictionary:
 		return {"ok": false, "errors": PackedStringArray(["save: root JSON value must be an object"])}
-	var errors := SaveEnvelopeScript.validate(value)
+	var migration: Dictionary = SaveMigrationRegistryScript.new().migrate(value)
+	if not migration.ok:
+		return migration
+	var errors := SaveEnvelopeScript.validate(migration.value)
 	if not errors.is_empty():
 		return {"ok": false, "errors": errors}
-	return {"ok": true, "value": value}
+	return {
+		"ok": true,
+		"value": migration.value,
+		"migrated": migration.migrated,
+		"from_version": migration.from_version,
+		"to_version": migration.to_version,
+	}

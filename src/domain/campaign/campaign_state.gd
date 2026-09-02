@@ -33,6 +33,8 @@ static func create(campaign_id: String) -> Dictionary:
 		"applied_settlement_ids": [],
 		"settlement_history": [],
 		"pending_long_term_effects": [],
+		"applied_finalization_ids": [],
+		"finalization_history": [],
 		"applied_army_action_ids": [],
 		"army_history": [],
 	}
@@ -58,10 +60,18 @@ static func normalize(source: Dictionary) -> Dictionary:
 		result.faction = FactionCycleServiceScript.normalize_faction_state(result.faction)
 	if result.get("pending_long_term_effects", null) is Array:
 		for effect in result.pending_long_term_effects:
+			if effect is Dictionary and not effect.has("army_losses"):
+				effect.army_losses = {"infantry": 0, "archer": 0, "cavalry": 0}
+			if effect is Dictionary and not effect.has("army_losses_applied"):
+				effect.army_losses_applied = false
 			if effect is Dictionary and not effect.has("general_effect_applied"):
 				effect.general_effect_applied = false
 			if effect is Dictionary and not effect.has("faction_effect_applied"):
 				effect.faction_effect_applied = false
+			if effect is Dictionary and not effect.has("army_loss_recovery"):
+				effect.army_loss_recovery = null
+			if effect is Dictionary and not effect.has("long_term_effects_finalized"):
+				effect.long_term_effects_finalized = false
 	return result
 
 
@@ -108,10 +118,121 @@ static func validate(state: Dictionary, source: String = "campaign") -> PackedSt
 		errors.append("%s: game_over campaign requires game_over_record" % source)
 	elif state.get("campaign_status", "") == "active" and state.get("game_over_record", null) != null:
 		errors.append("%s: active campaign cannot have game_over_record" % source)
-	for field in ["generals", "unlocked_public_cards", "territories", "applied_settlement_ids", "settlement_history", "pending_long_term_effects", "applied_army_action_ids", "army_history"]:
+	for field in ["generals", "unlocked_public_cards", "territories", "applied_settlement_ids", "settlement_history", "pending_long_term_effects", "applied_finalization_ids", "finalization_history", "applied_army_action_ids", "army_history"]:
 		if not state.get(field, null) is Array:
 			errors.append("%s: %s must be an array" % [source, field])
+	_validate_pending_effects(state.get("pending_long_term_effects", null), source, errors)
+	_validate_unique_string_ids(state.get("applied_finalization_ids", null), "%s.applied_finalization_ids" % source, errors)
+	_validate_finalization_consistency(state, source, errors)
 	return errors
+
+
+static func _validate_pending_effects(value: Variant, source: String, errors: PackedStringArray) -> void:
+	if not value is Array:
+		return
+	var request_ids := {}
+	for index in value.size():
+		var effect = value[index]
+		var effect_source := "%s.pending_long_term_effects[%d]" % [source, index]
+		if not effect is Dictionary:
+			errors.append("%s must be an object" % effect_source)
+			continue
+		var request_id = effect.get("request_id", null)
+		if not request_id is String or request_id.strip_edges().is_empty():
+			errors.append("%s.request_id must be a non-empty string" % effect_source)
+		elif request_ids.has(request_id):
+			errors.append("%s has duplicate request_id '%s'" % [source, request_id])
+		else:
+			request_ids[request_id] = true
+		for string_field in ["general_id", "expedition_id"]:
+			if not effect.get(string_field, null) is String or effect[string_field].strip_edges().is_empty():
+				errors.append("%s.%s must be a non-empty string" % [effect_source, string_field])
+		if not effect.get("outcome", null) in ["success", "retreated", "failed"]:
+			errors.append("%s.outcome is unsupported" % effect_source)
+		for numeric_field in ["remaining_troops", "remaining_morale"]:
+			if not _is_non_negative_whole_number(effect.get(numeric_field, null)):
+				errors.append("%s.%s must be non-negative" % [effect_source, numeric_field])
+		for flag in ["general_died", "general_injured"]:
+			if not effect.get(flag, null) is bool:
+				errors.append("%s.%s must be boolean" % [effect_source, flag])
+		if bool(effect.get("general_died", false)) and bool(effect.get("general_injured", false)):
+			errors.append("%s cannot mark death and injury together" % effect_source)
+		for flag in ["army_losses_applied", "general_effect_applied", "faction_effect_applied", "long_term_effects_finalized"]:
+			if not effect.get(flag, null) is bool:
+				errors.append("%s.%s must be boolean" % [effect_source, flag])
+		errors.append_array(ArmyManagementServiceScript.validate_inventory(effect.get("army_losses", null), "%s.army_losses" % effect_source))
+		var recovery = effect.get("army_loss_recovery", null)
+		if recovery != null and not recovery is Dictionary:
+			errors.append("%s.army_loss_recovery must be null or an object" % effect_source)
+		elif recovery is Dictionary:
+			if recovery.get("type", "") != "legacy_snapshot_unavailable":
+				errors.append("%s.army_loss_recovery has unsupported type" % effect_source)
+			if String(recovery.get("reason", "")).strip_edges().is_empty():
+				errors.append("%s.army_loss_recovery requires a reason" % effect_source)
+			errors.append_array(ArmyManagementServiceScript.validate_inventory(recovery.get("inventory_change", null), "%s.army_loss_recovery.inventory_change" % effect_source))
+			for army_type in ArmyManagementServiceScript.ARMY_TYPE_IDS:
+				if recovery.get("inventory_change", null) is Dictionary and int(recovery.inventory_change.get(army_type, -1)) != 0:
+					errors.append("%s.army_loss_recovery cannot change inventory" % effect_source)
+			if not bool(effect.get("army_losses_applied", false)):
+				errors.append("%s.army_loss_recovery requires applied army losses" % effect_source)
+		if bool(effect.get("long_term_effects_finalized", false)) and not (
+			bool(effect.get("army_losses_applied", false))
+			and bool(effect.get("general_effect_applied", false))
+			and bool(effect.get("faction_effect_applied", false))
+		):
+			errors.append("%s cannot be finalized before all consumers are applied" % effect_source)
+
+
+static func _validate_unique_string_ids(value: Variant, source: String, errors: PackedStringArray) -> void:
+	if not value is Array:
+		return
+	var seen := {}
+	for id in value:
+		if not id is String or id.strip_edges().is_empty():
+			errors.append("%s must contain non-empty strings" % source)
+		elif seen.has(id):
+			errors.append("%s contains duplicate id '%s'" % [source, id])
+		else:
+			seen[id] = true
+
+
+static func _validate_finalization_consistency(state: Dictionary, source: String, errors: PackedStringArray) -> void:
+	var effects = state.get("pending_long_term_effects", null)
+	var applied_ids = state.get("applied_finalization_ids", null)
+	if not effects is Array or not applied_ids is Array:
+		return
+	var effect_by_request := {}
+	for effect in effects:
+		if effect is Dictionary and effect.get("request_id", null) is String:
+			effect_by_request[effect.request_id] = effect
+	for request_id in applied_ids:
+		if not request_id is String:
+			continue
+		if not effect_by_request.has(request_id):
+			errors.append("%s.applied_finalization_ids references unknown request '%s'" % [source, request_id])
+		elif not bool(effect_by_request[request_id].get("long_term_effects_finalized", false)):
+			errors.append("%s.applied_finalization_ids references unfinished request '%s'" % [source, request_id])
+	for request_id in effect_by_request:
+		if bool(effect_by_request[request_id].get("long_term_effects_finalized", false)) and not applied_ids.has(request_id):
+			errors.append("%s finalized request '%s' is missing from applied_finalization_ids" % [source, request_id])
+	var history = state.get("finalization_history", null)
+	if not history is Array:
+		return
+	var history_ids := {}
+	for index in history.size():
+		var record = history[index]
+		if not record is Dictionary or not record.get("request_id", null) is String or record.request_id.strip_edges().is_empty():
+			errors.append("%s.finalization_history[%d] requires a request_id" % [source, index])
+			continue
+		if history_ids.has(record.request_id):
+			errors.append("%s.finalization_history contains duplicate request '%s'" % [source, record.request_id])
+		else:
+			history_ids[record.request_id] = true
+		if not applied_ids.has(record.request_id):
+			errors.append("%s.finalization_history references unapplied request '%s'" % [source, record.request_id])
+	for request_id in applied_ids:
+		if request_id is String and not history_ids.has(request_id):
+			errors.append("%s applied finalization '%s' is missing history" % [source, request_id])
 
 
 static func _is_non_negative_whole_number(value: Variant) -> bool:

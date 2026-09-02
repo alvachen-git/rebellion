@@ -7,6 +7,11 @@ const MANUAL_SAVE_CONTEXTS := {
 	"main_city": true,
 	"expedition_map": true,
 }
+const AUTOSAVE_EVENTS := {
+	"new_campaign": true,
+	"expedition_node_settled": true,
+	"expedition_final_settled": true,
+}
 
 
 static func manual_slot_id(slot_number: int) -> String:
@@ -17,6 +22,10 @@ static func manual_slot_id(slot_number: int) -> String:
 
 static func can_manual_save(context: String) -> bool:
 	return MANUAL_SAVE_CONTEXTS.has(context)
+
+
+static func should_autosave(event: String) -> bool:
+	return AUTOSAVE_EVENTS.has(event)
 
 
 static func recovery_mode_for_context(context: String) -> String:

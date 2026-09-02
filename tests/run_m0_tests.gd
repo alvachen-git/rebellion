@@ -90,7 +90,7 @@ func _test_shuffle_is_deterministic_and_non_mutating() -> void:
 
 func _test_save_envelope_is_valid() -> void:
 	var envelope := SaveEnvelopeScript.create_empty("campaign-test", "2026-09-01T00:00:00Z")
-	_assert_true(SaveEnvelopeScript.validate(envelope).is_empty(), "new save envelope satisfies version 1 schema")
+	_assert_true(SaveEnvelopeScript.validate(envelope).is_empty(), "new save envelope satisfies version 2 schema")
 	_assert_equal(envelope.campaign.resources.keys().size(), 4, "campaign starts with four main resources")
 
 
@@ -123,6 +123,10 @@ func _test_save_slot_policy() -> void:
 	_assert_true(SaveSlotPolicyScript.can_manual_save("main_city"), "manual save is allowed in main city")
 	_assert_true(SaveSlotPolicyScript.can_manual_save("expedition_map"), "manual save is allowed between nodes")
 	_assert_true(not SaveSlotPolicyScript.can_manual_save("combat"), "manual save is disallowed during combat")
+	_assert_true(SaveSlotPolicyScript.should_autosave("new_campaign"), "new campaign requests an autosave")
+	_assert_true(SaveSlotPolicyScript.should_autosave("expedition_node_settled"), "settled expedition node requests an autosave")
+	_assert_true(SaveSlotPolicyScript.should_autosave("expedition_final_settled"), "final expedition settlement requests an autosave")
+	_assert_true(not SaveSlotPolicyScript.should_autosave("combat_turn"), "combat turns never request full-state autosaves")
 	_assert_equal(
 		SaveSlotPolicyScript.recovery_mode_for_context("combat"),
 		"restart_current_battle_from_checkpoint",
