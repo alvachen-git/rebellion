@@ -75,6 +75,12 @@ func _test_catalog_contract() -> void:
 	_assert_equal(errors.size(), 0, "every required stable id resolves to an existing presentation asset: %s" % "; ".join(errors))
 	for combatant_id in COMBATANT_IDS:
 		_assert_equal(String(catalog.entry(combatant_id).get("kind", "")), "combatant_standee", "%s is registered as a battlefield standee" % combatant_id)
+	_assert_equal(String(catalog.entry("ui.combat.status_brush_mask").get("kind", "")), "ui_texture", "selected ink-stroke status mask is registered as a UI texture")
+	_assert_true(ResourceLoader.exists(String(catalog.entry("ui.combat.status_brush_mask").get("path", ""))), "selected ink-stroke status mask imports")
+	_assert_true(
+		String(catalog.entry("screen.combat.heyuan").get("path", "")).ends_with("chenwu_songgu_battlefield_v2.png"),
+		"combat screen binds the selected morning pine valley background plate"
+	)
 	for representative_id in [
 		"card.public.general.assault", "card.public.general.guard", "card.public.morale.war_cry",
 		"card.public.archery.repeating_crossbow", "card.public.cavalry.charge",
