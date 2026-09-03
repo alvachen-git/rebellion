@@ -117,7 +117,7 @@ func _test_v3_migration_and_frozen_expedition() -> void:
 	}
 	legacy.expedition.deck = _registry.get_general("general.zhao_lie").starting_deck.duplicate()
 	var decoded: Dictionary = SaveGameCodecScript.new().decode(JSON.stringify(legacy))
-	_assert_true(decoded.ok and decoded.to_version == 6, "Save V3 migrates through Save V6")
+	_assert_true(decoded.ok and decoded.to_version == 7, "Save V3 migrates through Save V7")
 	_assert_equal(decoded.value.content_version, "0.6.0-m6-flow", "Save V3 migration preserves source content version")
 	_assert_true(decoded.value.campaign.loadout_system.requires_legacy_recovery, "Save V3 migration requires explicit shared-deck recovery")
 	_assert_equal(decoded.value.campaign.loadout_system.legacy_general_loadouts.size(), 3, "all three obsolete loadouts are retained for audit")

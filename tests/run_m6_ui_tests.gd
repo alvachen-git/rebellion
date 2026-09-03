@@ -94,6 +94,11 @@ func _test_player_visible_vertical_slice() -> void:
 	_assert_equal(combat.combat_snapshot().result.status, "victory", "the deterministic first encounter is won through CombatController")
 	(combat.find_child("RestartButton", true, false) as Button).pressed.emit()
 	await _settle_frames()
+	_assert_equal(shell.current_phase(), "combat_report", "confirming a victory opens the persisted combat report")
+	_assert_true(shell.find_child("CombatReportStage", true, false) != null, "combat report has a dedicated player-visible stage")
+	_assert_true("经验 +15" in (shell.find_child("CombatReportExperienceGain", true, false) as Label).text, "normal victory visibly grants fifteen experience")
+	(shell.find_child("AcknowledgeCombatReportButton", true, false) as Button).pressed.emit()
+	await _settle_frames()
 	_assert_equal(shell.current_phase(), "expedition_map", "confirming the battle result returns to the route map")
 
 	for step in 24:
@@ -174,7 +179,17 @@ func _test_event_choice_feedback() -> void:
 	await _settle_frames()
 	var request: Dictionary = shell.flow_snapshot().expedition.pending_combat
 	var combat = shell.find_child("IntegratedCombat", true, false)
+	var previous_reduce_motion = ProjectSettings.get_setting("accessibility/reduce_motion", false)
+	ProjectSettings.set_setting("accessibility/reduce_motion", true)
 	combat.battle_finished.emit({"battle_id": request.battle_id, "status": "victory", "player_remaining_troops": 1010, "player_remaining_morale": 76, "general_died": false, "general_injured": false})
+	await _settle_frames()
+	var reduced_bar := shell.find_child("CombatReportExperienceBar", true, false) as ProgressBar
+	_assert_equal(int(reduced_bar.value), int(shell.flow_snapshot().expedition.pending_combat_report.projected_experience), "reduced-motion report immediately shows the final experience value")
+	ProjectSettings.set_setting("accessibility/reduce_motion", previous_reduce_motion)
+	var report_button := shell.find_child("AcknowledgeCombatReportButton", true, false) as Button
+	var scale_factor := minf(1280.0 / 1600.0, 720.0 / 900.0)
+	_assert_true(report_button != null and (report_button.get_global_rect().end * scale_factor).y <= 720.0, "combat report continuation remains reachable at 1280x720")
+	(shell.find_child("AcknowledgeCombatReportButton", true, false) as Button).pressed.emit()
 	await _settle_frames()
 	var event_button: Button = shell.find_child("RouteMap", true, false).button_for_node(event_id)
 	_assert_true(event_button != null and not event_button.disabled, "a forecast event node becomes actionable only after its preceding battle")
@@ -260,6 +275,16 @@ func _settle_next_rogue_step(shell, step: int) -> void:
 			"general_injured": false,
 		})
 		await _settle_frames()
+	if shell.current_phase() == "combat_report":
+		var report: Dictionary = shell.flow_snapshot().expedition.pending_combat_report
+		if bool(report.get("expedition_terminal", false)):
+			_assert_true("克城大捷" in (shell.find_child("CombatReportTitle", true, false) as Label).text, "Boss victory uses the large-victory report title")
+			_assert_true(shell.find_child("CombatReportLevelPreview", true, false) != null, "one hundred route experience previews the return-time level up")
+		var continue_button := shell.find_child("AcknowledgeCombatReportButton", true, false) as Button
+		_assert_true(continue_button != null and not continue_button.disabled, "victory report exposes its continue action")
+		if continue_button != null:
+			continue_button.pressed.emit()
+			await _settle_frames()
 
 
 func _create_shell():

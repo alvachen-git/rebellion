@@ -120,6 +120,7 @@ func apply_expedition_settlement(request: Dictionary) -> Dictionary:
 		"army_losses": army_losses.duplicate(true),
 		"rebellion_delta": rebellion_delta,
 		"popular_support_delta": popular_support_delta,
+		"experience_gained": int(request.get("experience_gained", _general_progression.get("experience_by_outcome", {}).get(request.outcome, 0))),
 		"card_unlocks": request.get("pending_card_unlocks", []).duplicate(true) if request.outcome == "success" else [],
 	})
 	next_state.pending_long_term_effects.append({
@@ -131,6 +132,7 @@ func apply_expedition_settlement(request: Dictionary) -> Dictionary:
 		"general_injured": bool(request.general_injured),
 		"expedition_id": request.expedition_id,
 		"outcome": request.outcome,
+		"experience_gained": int(request.get("experience_gained", _general_progression.get("experience_by_outcome", {}).get(request.outcome, 0))),
 		"army_losses": army_losses.duplicate(true),
 		"army_losses_applied": request.has("initial_troops") and request.has("army_composition"),
 		"army_loss_recovery": null,
@@ -832,6 +834,8 @@ func _validate_settlement(request: Dictionary) -> PackedStringArray:
 		errors.append("settlement: rebellion_delta must be an integer")
 	if not _is_whole_number(request.get("popular_support_delta", 0)):
 		errors.append("settlement: popular_support_delta must be an integer")
+	if request.has("experience_gained") and not _is_non_negative_whole_number(request.experience_gained):
+		errors.append("settlement: experience_gained must be a non-negative integer")
 	var unlocks = request.get("pending_card_unlocks", [])
 	if not unlocks is Array:
 		errors.append("settlement: pending_card_unlocks must be an array")
@@ -961,6 +965,8 @@ func _validate_pending_general_effect(effect: Dictionary, request_id: String) ->
 		return "general effect: unsupported outcome '%s'" % effect.outcome
 	if not _is_non_negative_whole_number(effect.remaining_troops):
 		return "general effect: remaining_troops must be non-negative"
+	if effect.has("experience_gained") and not _is_non_negative_whole_number(effect.experience_gained):
+		return "general effect: experience_gained must be non-negative"
 	for field in ["general_died", "general_injured", "general_effect_applied"]:
 		if not effect[field] is bool:
 			return "general effect: %s must be boolean" % field

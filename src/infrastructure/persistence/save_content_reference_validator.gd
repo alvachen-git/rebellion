@@ -77,6 +77,20 @@ func validate(envelope: Dictionary, registry: RefCounted) -> PackedStringArray:
 				var enemy_id := String(choice.get("combat_enemy_id", ""))
 				if not enemy_id.is_empty() and not registry.has_enemy(enemy_id):
 					errors.append("save references: expedition.pending_encounter references missing enemy '%s'" % enemy_id)
+		var pending_report = expedition.get("pending_combat_report", null)
+		if pending_report is Dictionary and not pending_report.is_empty():
+			var report_enemy_id := String(pending_report.get("enemy_id", ""))
+			if not registry.has_enemy(report_enemy_id):
+				errors.append("save references: expedition.pending_combat_report references missing enemy '%s'" % report_enemy_id)
+			var gained_item_id := String(pending_report.get("item_gained", ""))
+			if not gained_item_id.is_empty():
+				var item_found := false
+				for item in expedition.get("temporary_items", []):
+					if item is Dictionary and item.get("item_id", "") == gained_item_id:
+						item_found = true
+						break
+				if not item_found:
+					errors.append("save references: expedition.pending_combat_report item '%s' is not present in the expedition inventory" % gained_item_id)
 	return errors
 
 
@@ -158,6 +172,9 @@ func _validate_expedition_nodes(expedition: Dictionary, registry: RefCounted, er
 		var context = pending.get("expedition_context", null)
 		if context is Dictionary:
 			_validate_node_id(String(context.get("node_id", "")), "expedition.pending_combat.expedition_context.node_id", node_ids, errors)
+	var pending_report = expedition.get("pending_combat_report", null)
+	if pending_report is Dictionary and not pending_report.is_empty():
+		_validate_node_id(String(pending_report.get("node_id", "")), "expedition.pending_combat_report.node_id", node_ids, errors)
 
 
 func _validate_node_id(node_id: String, source: String, node_ids: Dictionary, errors: PackedStringArray) -> void:

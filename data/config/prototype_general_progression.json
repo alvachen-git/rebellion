@@ -15,6 +15,14 @@
     "retreated": 25,
     "failed": 10
   },
+  "victory_experience": {
+    "normal_combat": 15,
+    "military_objective": 15,
+    "wealth_risk": 15,
+    "merchant_combat": 15,
+    "elite_combat": 25,
+    "boss": 30
+  },
   "major_injury_recovery_cycles": 2,
   "attribute_growth": {
     "2": {"martial": 1, "leadership": 1, "administration": 1},

@@ -96,6 +96,8 @@ func phase() -> String:
 	var expedition_state: Dictionary = _expedition.snapshot()
 	if not expedition_state.get("pending_combat", {}).is_empty():
 		return "combat_checkpoint"
+	if not expedition_state.get("pending_combat_report", {}).is_empty():
+		return "combat_report"
 	if not expedition_state.get("pending_encounter", {}).is_empty():
 		return "reward_choice" if expedition_state.pending_encounter.get("kind", "") == "reward" else "encounter_choice"
 	if expedition_state.get("status", "") == "active":
@@ -243,7 +245,7 @@ func start_expedition(request: Dictionary, _timestamp: String) -> Dictionary:
 		return _failure(generated.error)
 	var run = ExpeditionRunStateScript.new()
 	var initial_support := int(_campaign.snapshot().get("popular_support_state", {}).get("value", 20))
-	var errors: PackedStringArray = run.setup(request.run_id, generated.map, assembled.general, assembled.deck, assembled.card_overrides, initial_support)
+	var errors: PackedStringArray = run.setup(request.run_id, generated.map, assembled.general, assembled.deck, assembled.card_overrides, initial_support, _config.general_progression)
 	if not errors.is_empty():
 		return {"ok": false, "errors": errors}
 	_expedition = run
@@ -405,6 +407,21 @@ func pending_combat_request() -> Dictionary:
 	return _expedition.pending_combat_request()
 
 
+func pending_combat_report() -> Dictionary:
+	if _expedition == null:
+		return {}
+	var report: Dictionary = _expedition.pending_combat_report()
+	if report.is_empty():
+		return report
+	var enemy: Dictionary = _registry.get_enemy(String(report.get("enemy_id", "")))
+	report.enemy_name = enemy.get("name", report.get("enemy_id", "未知敌军"))
+	var item_id := String(report.get("item_gained", ""))
+	if not item_id.is_empty():
+		var item: Dictionary = _encounters.item_definition(item_id)
+		report.item_name = item.get("name", item_id)
+	return report
+
+
 func submit_combat_result(result: Dictionary, timestamp: String) -> Dictionary:
 	if phase() != "combat_checkpoint":
 		var battle_id: String = String(result.get("battle_id", ""))
@@ -416,13 +433,35 @@ func submit_combat_result(result: Dictionary, timestamp: String) -> Dictionary:
 	if not applied.ok:
 		return applied
 	_sync_expedition()
-	var event: String = "expedition_terminal_checkpoint" if phase() == "settlement_pending" else "expedition_node_settled"
+	var event: String = "combat_report_created" if phase() == "combat_report" else ("expedition_terminal_checkpoint" if phase() == "settlement_pending" else "expedition_node_settled")
 	var saved: Dictionary = _autosave(event, timestamp)
 	if not saved.ok:
 		_restore_envelope(before)
 		return saved
 	applied.phase = phase()
 	return applied
+
+
+func acknowledge_combat_report(request: Dictionary, timestamp: String) -> Dictionary:
+	var action_id := String(request.get("action_id", ""))
+	if _expedition != null and _expedition.snapshot().get("acknowledged_combat_report_action_ids", []).has(action_id):
+		return {"ok": true, "duplicate": true, "errors": PackedStringArray(), "phase": phase()}
+	if phase() != "combat_report":
+		return _failure("game flow: no combat report is pending")
+	var report_id := String(request.get("report_id", ""))
+	if action_id.strip_edges().is_empty() or report_id.strip_edges().is_empty():
+		return _failure("game flow: combat report confirmation requires action_id and report_id")
+	var before := _current_envelope()
+	var acknowledged: Dictionary = _expedition.acknowledge_combat_report(action_id, report_id)
+	if not acknowledged.ok:
+		return acknowledged
+	_sync_expedition()
+	var saved := _autosave("combat_report_acknowledged", timestamp)
+	if not saved.ok:
+		_restore_envelope(before)
+		return saved
+	acknowledged.phase = phase()
+	return acknowledged
 
 
 func finalize_expedition(timestamp: String) -> Dictionary:
@@ -489,7 +528,8 @@ func _restore_envelope(source: Dictionary) -> PackedStringArray:
 		if not generated.ok:
 			return PackedStringArray([generated.error])
 		run = ExpeditionRunStateScript.new()
-		errors.append_array(run.restore(source.expedition, generated.map))
+		var campaign_general := _find_campaign_general(source.campaign.get("generals", []), String(source.expedition.get("general", {}).get("id", "")))
+		errors.append_array(run.restore(source.expedition, generated.map, _config.general_progression, campaign_general))
 		if not errors.is_empty():
 			return errors
 	_envelope = source.duplicate(true)

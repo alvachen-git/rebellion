@@ -188,6 +188,8 @@ func _render_current_phase() -> void:
 			_render_encounter()
 		"combat_checkpoint":
 			_render_combat()
+		"combat_report":
+			_render_combat_report()
 		"settlement_pending":
 			_render_settlement()
 		"game_over":
@@ -804,6 +806,137 @@ func _on_battle_finished(result: Dictionary) -> void:
 	_render_current_phase()
 
 
+func _render_combat_report() -> void:
+	var expedition: Dictionary = _flow.expedition_run_snapshot()
+	var report: Dictionary = _flow.pending_combat_report()
+	phase_label.text = "%s  /  战后捷报" % expedition.destination_name
+	save_status.text = "战果与历练已自动保存"
+	var page := VBoxContainer.new()
+	page.name = "CombatReportStage"
+	page.add_theme_constant_override("separation", 14)
+	var heading := HBoxContainer.new()
+	var heading_copy := VBoxContainer.new()
+	heading_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var title := _label("克城大捷" if bool(report.get("expedition_terminal", false)) else "破敌", 46, DANGER)
+	title.name = "CombatReportTitle"
+	heading_copy.add_child(title)
+	heading_copy.add_child(_label("击破%s · 第%d场胜利" % [report.get("enemy_name", "敌军"), int(report.get("completed_battles", 0))], 19, PARCHMENT))
+	heading.add_child(heading_copy)
+	var seal := _label("捷\n报", 28, Tokens.PAPER_BRIGHT)
+	seal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	seal.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	seal.custom_minimum_size = Vector2(84, 84)
+	var seal_panel := PanelContainer.new()
+	var seal_style := Tokens.panel_style(DANGER, Tokens.with_alpha(Tokens.CINNABAR.darkened(0.28), 0.9), 42, 3, 8)
+	seal_panel.add_theme_stylebox_override("panel", seal_style)
+	seal_panel.add_child(seal)
+	heading.add_child(seal_panel)
+	page.add_child(heading)
+	page.add_child(HSeparator.new())
+	var workspace := HBoxContainer.new()
+	workspace.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workspace.add_theme_constant_override("separation", 18)
+	var general_data := {
+		"general_id": expedition.general.id,
+		"name": expedition.general.name,
+		"level": int(report.get("current_level", 1)),
+		"experience": int(report.get("projected_experience", 0)),
+		"status": "active",
+		"injury": {"status": "healthy"},
+		"attributes": expedition.general.get("attributes", {}),
+	}
+	var general_card = GeneralCardViewScript.new()
+	general_card.configure(general_data, {"available": true, "selected": true}, GeneralCardViewScript.Density.COMPACT)
+	general_card.custom_minimum_size = Vector2(270, 0)
+	workspace.add_child(general_card)
+	var growth := VBoxContainer.new()
+	growth.custom_minimum_size = Vector2(390, 0)
+	growth.add_theme_constant_override("separation", 12)
+	growth.add_child(_section_title("武将历练"))
+	var experience_gain := _label("经验 +%d" % int(report.get("experience_gained", 0)), 32, SUCCESS)
+	experience_gain.name = "CombatReportExperienceGain"
+	growth.add_child(experience_gain)
+	var experience_bar := ProgressBar.new()
+	experience_bar.name = "CombatReportExperienceBar"
+	experience_bar.custom_minimum_size = Vector2(0, 28)
+	experience_bar.min_value = 0
+	experience_bar.max_value = maxf(1.0, float(report.get("next_level_experience", report.get("projected_experience", 1))))
+	experience_bar.value = float(report.get("projected_experience", 0))
+	experience_bar.show_percentage = false
+	experience_bar.add_theme_stylebox_override("background", Tokens.panel_style(Tokens.with_alpha(Tokens.PAPER_SHADE, 0.72), Tokens.PAPER_SHADE, Tokens.RADIUS_SM, 0, 0))
+	experience_bar.add_theme_stylebox_override("fill", Tokens.panel_style(Tokens.MINERAL_GREEN, Tokens.MINERAL_GREEN, Tokens.RADIUS_SM, 0, 0))
+	growth.add_child(experience_bar)
+	var experience_text := _label("累计经验 %d · 本趟已获 %d" % [int(report.get("projected_experience", 0)), int(report.get("pending_experience_total", 0))], 16, PARCHMENT)
+	experience_text.name = "CombatReportExperienceTotal"
+	growth.add_child(experience_text)
+	if int(report.get("projected_level", 1)) > int(report.get("current_level", 1)):
+		var upgrade_text := "回城后可升至 Lv.%d" % int(report.projected_level)
+		var attribute_growth: Dictionary = report.get("projected_attribute_growth", {})
+		if not attribute_growth.is_empty():
+			upgrade_text += "\n武勇 %+d · 统率 %+d · 政务 %+d" % [int(attribute_growth.get("martial", 0)), int(attribute_growth.get("leadership", 0)), int(attribute_growth.get("administration", 0))]
+		var upgrade := _label(upgrade_text, 18, BRONZE)
+		upgrade.name = "CombatReportLevelPreview"
+		growth.add_child(upgrade)
+	else:
+		growth.add_child(_label("历练将在回城结算时正式生效。", 14, MUTED))
+	workspace.add_child(_paper_panel(growth))
+	var rewards := VBoxContainer.new()
+	rewards.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rewards.add_theme_constant_override("separation", 10)
+	rewards.add_child(_section_title("本场战果"))
+	var troop_delta := int(report.get("troops_delta", 0))
+	var morale_delta := int(report.get("morale_delta", 0))
+	var losses := _label("兵力 %d  %s\n士气 %d  %s" % [int(report.get("troops_after", 0)), _signed_value(troop_delta), int(report.get("morale_after", 0)), _signed_value(morale_delta)], 18, DANGER if troop_delta < 0 else PARCHMENT)
+	losses.name = "CombatReportLosses"
+	rewards.add_child(losses)
+	rewards.add_child(HSeparator.new())
+	var loot_gained: Dictionary = report.get("loot_gained", {})
+	var reward_text := "本场奖励：%s" % (_loot_text(loot_gained) if not loot_gained.is_empty() else "无资源")
+	if not String(report.get("item_name", "")).is_empty():
+		reward_text += "\n临时物品：%s" % report.item_name
+	var reward_label := _label(reward_text, 18, SUCCESS)
+	reward_label.name = "CombatReportRewards"
+	rewards.add_child(reward_label)
+	var total_label := _label("战利品袋：%s" % _loot_text(report.get("unbanked_loot_total", {})), 15, BRONZE)
+	total_label.name = "CombatReportLootTotal"
+	total_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rewards.add_child(total_label)
+	var warning := _label("尚未入库 · 远征失败将全部丢失", 15, DANGER)
+	warning.name = "CombatReportLootWarning"
+	rewards.add_child(warning)
+	var route_progress: Dictionary = report.get("route_progress", {})
+	rewards.add_child(_label("行军进度：第%d / %d层" % [int(route_progress.get("layer", 0)), int(route_progress.get("max_layer", 8))], 14, MUTED))
+	if bool(report.get("post_battle_reward_pending", false)):
+		rewards.add_child(_label("发现新军略 · 继续后进行选择", 16, BRONZE))
+	workspace.add_child(_paper_panel(rewards, true))
+	page.add_child(workspace)
+	var continue_button := _button("查看远征总报" if bool(report.get("expedition_terminal", false)) else "收拢队伍，继续行军", true, Vector2(280, 52))
+	continue_button.name = "AcknowledgeCombatReportButton"
+	continue_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	continue_button.pressed.connect(_acknowledge_combat_report.bind(String(report.get("report_id", ""))))
+	page.add_child(continue_button)
+	if not _notice.is_empty():
+		page.add_child(_notice_label())
+	_set_stage(page)
+	if not MotionPolicyScript.reduced():
+		experience_bar.value = float(report.get("experience_before", 0))
+		growth.modulate.a = 0.0
+		rewards.modulate.a = 0.0
+		continue_button.modulate.a = 0.0
+		var tween := create_tween()
+		tween.tween_interval(0.08)
+		tween.tween_property(growth, "modulate:a", 1.0, 0.16)
+		tween.parallel().tween_property(experience_bar, "value", float(report.get("projected_experience", 0)), 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(rewards, "modulate:a", 1.0, 0.18)
+		tween.tween_property(continue_button, "modulate:a", 1.0, 0.14)
+
+
+func _acknowledge_combat_report(report_id: String) -> void:
+	var result: Dictionary = _flow.acknowledge_combat_report({"action_id": _action_id("combat-report"), "report_id": report_id}, _timestamp())
+	_notice = "战果已记入军簿。" if result.ok else _result_error(result)
+	_render_current_phase()
+
+
 func _render_settlement() -> void:
 	var expedition: Dictionary = _flow.snapshot().expedition
 	phase_label.text = "远征终报  /  待最终结算"
@@ -831,6 +964,13 @@ func _render_settlement() -> void:
 		("待入库战利品：%s" % _loot_text(expedition.unbanked_loot)) if success else ("已失去战利品：%s" % _loot_text(expedition.lost_unbanked_loot)),
 	]
 	summary += "\n义军民望：%d（本次 %+d）    本次叛乱：%+d" % [int(expedition.projected_popular_support), int(expedition.pending_popular_support_delta), int(expedition.pending_rebellion_delta)]
+	var experience_total := int(expedition.get("pending_battle_experience", 0))
+	if bool(expedition.get("general_died", false)):
+		summary += "\n本趟历练：%d（武将阵亡，无法保留）" % experience_total
+	else:
+		summary += "\n本趟历练：+%d经验" % experience_total
+		if int(expedition.get("projected_general_level", expedition.get("initial_general_level", 1))) > int(expedition.get("initial_general_level", 1)):
+			summary += " · 回城后升至 Lv.%d" % int(expedition.projected_general_level)
 	var detail := _label(summary, 20, PARCHMENT)
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(detail)
@@ -1250,6 +1390,10 @@ func _loot_text(loot: Dictionary) -> String:
 	for resource_id in loot:
 		parts.append("%s +%d" % [names.get(resource_id, resource_id), int(loot[resource_id])])
 	return "  ·  ".join(parts)
+
+
+func _signed_value(value: int) -> String:
+	return "%+d" % value
 
 
 func _army_total() -> int:

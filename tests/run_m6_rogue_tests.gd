@@ -358,7 +358,7 @@ func _test_save_v5_migration() -> void:
 	source.campaign.erase("rebellion_state")
 	source.campaign.territories.append({"territory_id": "territory.heyuan_county", "name": "河源县", "status": "controlled", "income_enabled": true, "acquired_cycle": 0, "source_request_id": "legacy:v4"})
 	var decoded: Dictionary = SaveGameCodecScript.new().decode(JSON.stringify(source))
-	_assert_true(decoded.ok and decoded.to_version == 6, "Save V4 migrates through Save V6")
+	_assert_true(decoded.ok and decoded.to_version == 7, "Save V4 migrates through Save V7")
 	_assert_equal(decoded.value.campaign.popular_support_state.value, 20, "legacy campaign starts with twenty popular support")
 	if decoded.ok:
 		_assert_equal(decoded.value.campaign.rebellion_state.value, 30, "V4 Heyuan ownership infers thirty rebellion")
@@ -405,7 +405,7 @@ func _test_save_v5_migration() -> void:
 	v5_source.expedition.erase("initial_popular_support")
 	v5_source.expedition.erase("pending_popular_support_delta")
 	var v5_decoded: Dictionary = SaveGameCodecScript.new().decode(JSON.stringify(v5_source))
-	_assert_true(v5_decoded.ok and v5_decoded.to_version == 6, "Save V5 active V2 run migrates to V6")
+	_assert_true(v5_decoded.ok and v5_decoded.to_version == 7, "Save V5 active V2 run migrates to V7")
 	if v5_decoded.ok:
 		_assert_equal(v5_decoded.value.expedition.generator_version, 2, "V5 migration preserves active generator V2")
 		_assert_equal(v5_decoded.value.expedition.map_signature, v2_generated.map.map_signature, "V5 migration preserves the V2 map signature")
@@ -563,6 +563,12 @@ func _complete_rogue_route(flow, take_permanent: bool) -> Dictionary:
 				var submitted: Dictionary = flow.submit_combat_result(result, _timestamp())
 				if not submitted.ok:
 					return submitted
+			"combat_report":
+				var report: Dictionary = flow.pending_combat_report()
+				var acknowledged: Dictionary = flow.acknowledge_combat_report({"action_id": "report.%d" % _action_sequence, "report_id": report.get("report_id", "")}, _timestamp())
+				_action_sequence += 1
+				if not acknowledged.ok:
+					return acknowledged
 			"encounter_choice", "reward_choice":
 				var encounter: Dictionary = flow.pending_encounter()
 				var choice_id := _safe_choice_id(encounter)
@@ -587,6 +593,11 @@ func _submit_victory_after_advance(flow, node_id: String, label: String) -> void
 	var expedition: Dictionary = flow.snapshot().expedition
 	var result := {"battle_id": request.battle_id, "status": "victory", "player_remaining_troops": maxi(int(expedition.general.troops) - 5, 1), "player_remaining_morale": maxi(int(expedition.general.morale) - 1, 1), "general_died": false, "general_injured": false}
 	_assert_true(flow.submit_combat_result(result, _timestamp()).ok, "%s victory settles" % label)
+	var report: Dictionary = flow.pending_combat_report()
+	_assert_true(flow.phase() == "combat_report" and not report.is_empty(), "%s victory creates a combat report" % label)
+	var acknowledged: Dictionary = flow.acknowledge_combat_report({"action_id": "report.%d" % _action_sequence, "report_id": report.get("report_id", "")}, _timestamp())
+	_action_sequence += 1
+	_assert_true(acknowledged.ok, "%s combat report continues to the next phase" % label)
 
 
 func _submit_retreat_after_advance(flow, node_id: String, label: String) -> void:

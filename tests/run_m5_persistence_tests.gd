@@ -50,9 +50,9 @@ func _run_all() -> void:
 
 func _test_v2_envelope_and_sequential_v1_migration() -> void:
 	var current: Dictionary = SaveEnvelopeScript.create_empty("campaign.v2", "2026-09-02T00:00:00Z")
-	_assert_equal(current.save_version, 6, "new saves use explicit Save V6")
-	_assert_equal(current.content_version, "0.7.2-m6-route-variety", "new save content version matches the branching-route flow")
-	_assert_true(SaveEnvelopeScript.validate(current).is_empty(), "new Save V6 envelope satisfies the full CampaignState contract")
+	_assert_equal(current.save_version, 7, "new saves use explicit Save V7")
+	_assert_equal(current.content_version, "0.7.3-m6-battle-report", "new save content version matches the battle-report flow")
+	_assert_true(SaveEnvelopeScript.validate(current).is_empty(), "new Save V7 envelope satisfies the full CampaignState contract")
 	var legacy := current.duplicate(true)
 	legacy.save_version = 1
 	legacy.content_version = "0.1.0-m0"
@@ -64,15 +64,15 @@ func _test_v2_envelope_and_sequential_v1_migration() -> void:
 	var decoded: Dictionary = SaveGameCodecScript.new().decode(JSON.stringify(legacy))
 	_assert_true(decoded.ok and decoded.migrated, "Save V1 decodes through the registered migration chain")
 	_assert_equal(decoded.from_version, 1, "migration reports its source version")
-	_assert_equal(decoded.to_version, 6, "migration reports its target version")
-	_assert_equal(decoded.value.save_version, 6, "migration upgrades the envelope through Save V6")
+	_assert_equal(decoded.to_version, 7, "migration reports its target version")
+	_assert_equal(decoded.value.save_version, 7, "migration upgrades the envelope through Save V7")
 	_assert_equal(decoded.value.content_version, "0.1.0-m0", "migration preserves the source content version for audit")
 	_assert_equal(decoded.value.campaign.army_inventory, {"infantry": 0, "archer": 0, "cavalry": 0}, "migration adds all missing army stocks")
 	_assert_true(not decoded.value.campaign.pending_long_term_effects[0].army_losses_applied, "migration preserves unresolved legacy casualties explicitly")
 	_assert_true(not decoded.value.campaign.pending_long_term_effects[0].long_term_effects_finalized, "legacy effect remains unfinished after structural migration")
 	_assert_true(decoded.value.campaign.applied_finalization_ids.is_empty(), "migration adds an empty finalization ledger")
 	_assert_equal(legacy, untouched, "migration never mutates the caller's old-save DTO")
-	_assert_true(SaveEnvelopeScript.validate(decoded.value).is_empty(), "migrated Save V1 satisfies the current Save V6 schema")
+	_assert_true(SaveEnvelopeScript.validate(decoded.value).is_empty(), "migrated Save V1 satisfies the current Save V7 schema")
 
 
 func _test_migration_failures() -> void:

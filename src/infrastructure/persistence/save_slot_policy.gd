@@ -17,6 +17,8 @@ const AUTOSAVE_EVENTS := {
 	"encounter_choice_created": true,
 	"encounter_choice_settled": true,
 	"expedition_item_used": true,
+	"combat_report_created": true,
+	"combat_report_acknowledged": true,
 }
 
 

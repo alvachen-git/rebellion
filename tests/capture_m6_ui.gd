@@ -40,7 +40,7 @@ func _capture() -> void:
 		for frame in 3:
 			await process_frame
 		(shell.find_child("TargetButton_expedition_capture_heyuan_county", true, false) as Button).pressed.emit()
-	elif stage in ["map", "encounter", "event", "retreat", "morale_failure", "death"]:
+	elif stage in ["map", "encounter", "event", "combat_report", "boss_report", "retreat", "morale_failure", "death"]:
 		shell.open_deployment()
 		for frame in 3:
 			await process_frame
@@ -48,7 +48,9 @@ func _capture() -> void:
 		for frame in 3:
 			await process_frame
 		shell.start_selected_expedition()
-		if stage != "map":
+		if stage == "boss_report":
+			await _advance_to_boss_report(shell)
+		elif stage != "map":
 			for frame in 4:
 				await process_frame
 			var expedition_before_battle: Dictionary = shell.flow_snapshot().expedition
@@ -66,14 +68,18 @@ func _capture() -> void:
 			for frame in 4:
 				await process_frame
 			var expedition: Dictionary = shell.flow_snapshot().expedition
-			if stage in ["encounter", "event"]:
+			if stage in ["encounter", "event", "combat_report"]:
 				var first_request: Dictionary = expedition.pending_combat
 				var first_combat = shell.find_child("IntegratedCombat", true, false)
 				first_combat.battle_finished.emit({"battle_id": first_request.battle_id, "status": "victory", "player_remaining_troops": 1020, "player_remaining_morale": 75, "general_died": false, "general_injured": false})
 				for frame in 5:
 					await process_frame
-				var encounter_id := event_id if stage == "event" else String(shell.flow_snapshot().expedition.route.available_next_node_ids[0])
-				shell.select_map_node(encounter_id)
+				if stage != "combat_report":
+					(shell.find_child("AcknowledgeCombatReportButton", true, false) as Button).pressed.emit()
+					for frame in 4:
+						await process_frame
+					var encounter_id := event_id if stage == "event" else String(shell.flow_snapshot().expedition.route.available_next_node_ids[0])
+					shell.select_map_node(encounter_id)
 			else:
 				var result := {
 					"battle_id": expedition.pending_combat.battle_id,
@@ -99,3 +105,37 @@ func _capture() -> void:
 		return
 	print("CAPTURE SAVED: %s (%dx%d)" % [output_path, image.get_width(), image.get_height()])
 	quit(0)
+
+
+func _advance_to_boss_report(shell) -> void:
+	for step in 48:
+		match shell.current_phase():
+			"expedition_map":
+				var available: Array = shell.flow_snapshot().expedition.route.available_next_node_ids
+				if not available.is_empty():
+					shell.select_map_node(String(available[0]))
+			"combat_checkpoint":
+				var expedition: Dictionary = shell.flow_snapshot().expedition
+				var request: Dictionary = expedition.pending_combat
+				var combat = shell.find_child("IntegratedCombat", true, false)
+				combat.battle_finished.emit({"battle_id": request.battle_id, "status": "victory", "player_remaining_troops": int(expedition.general.troops), "player_remaining_morale": int(expedition.general.morale), "general_died": false, "general_injured": false})
+			"combat_report":
+				if bool(shell.flow_snapshot().expedition.pending_combat_report.get("expedition_terminal", false)):
+					return
+				(shell.find_child("AcknowledgeCombatReportButton", true, false) as Button).pressed.emit()
+			"encounter_choice", "reward_choice":
+				var choice := _first_enabled_choice(shell)
+				if choice != null:
+					choice.pressed.emit()
+		for frame in 4:
+			await process_frame
+
+
+func _first_enabled_choice(node: Node) -> Button:
+	if node is Button and node.name.begins_with("EncounterChoice_") and not node.disabled:
+		return node
+	for child in node.get_children():
+		var result := _first_enabled_choice(child)
+		if result != null:
+			return result
+	return null

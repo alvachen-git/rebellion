@@ -44,6 +44,8 @@ func _apply_step(version: int, source: Dictionary) -> Dictionary:
 		return _migrate_v4_to_v5(source)
 	if version == 5:
 		return _migrate_v5_to_v6(source)
+	if version == 6:
+		return _migrate_v6_to_v7(source)
 	return _failure("save migration: no migration registered from version %d" % version)
 
 
@@ -140,6 +142,33 @@ func _migrate_v5_to_v6(source: Dictionary) -> Dictionary:
 		result.expedition.initial_popular_support = int(result.campaign.popular_support_state.value)
 		result.expedition.pending_popular_support_delta = int(result.expedition.get("pending_popular_support_delta", 0))
 	result.save_version = 6
+	return {"ok": true, "errors": PackedStringArray(), "value": result}
+
+
+func _migrate_v6_to_v7(source: Dictionary) -> Dictionary:
+	for field in ["content_version", "created_at", "updated_at", "campaign", "expedition"]:
+		if not source.has(field):
+			return _failure("save migration v6->v7: missing field '%s'" % field)
+	if not source.campaign is Dictionary:
+		return _failure("save migration v6->v7: campaign must be an object")
+	var result := source.duplicate(true)
+	result.campaign = CampaignStateScript.normalize(result.campaign)
+	if result.expedition is Dictionary:
+		var general_id := String(result.expedition.get("general", {}).get("id", ""))
+		var campaign_general: Dictionary = {}
+		for general in result.campaign.get("generals", []):
+			if general is Dictionary and general.get("general_id", "") == general_id:
+				campaign_general = general
+				break
+		result.expedition.initial_general_level = int(campaign_general.get("level", result.expedition.get("general", {}).get("level", 1)))
+		result.expedition.initial_general_experience = int(campaign_general.get("experience", result.expedition.get("general", {}).get("experience", 0)))
+		result.expedition.pending_battle_experience = 0
+		result.expedition.battle_experience_ledger = []
+		result.expedition.pending_combat_report = {}
+		result.expedition.acknowledged_combat_report_action_ids = []
+		result.expedition.combat_report_history = []
+		result.expedition.experience_migration = {"source": "v6_resolution_history", "reconstructed": false}
+	result.save_version = 7
 	return {"ok": true, "errors": PackedStringArray(), "value": result}
 
 

@@ -114,6 +114,8 @@ func assemble(campaign: Dictionary, expedition_present: bool, request: Dictionar
 	var player := {
 		"id": definition.id,
 		"name": definition.name,
+		"level": int(general.level),
+		"experience": int(general.experience),
 		"talent_id": general.active_talent_id,
 		"troops": total,
 		"max_troops": total,
