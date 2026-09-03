@@ -38,7 +38,7 @@ func _run_all() -> void:
 
 
 func _test_boss_content_contract() -> void:
-	_assert_equal(_registry.enemy_count(), 9, "registry contains the development enemy, seven M3 enemies, and Yan Cheng")
+	_assert_equal(_registry.enemy_count(), 18, "registry contains the M3 roster and nine M6 Rogue enemies")
 	_assert_true(_registry.has_enemy(BOSS_ID), "Yan Cheng is registered")
 	var boss: Dictionary = _registry.get_enemy(BOSS_ID)
 	_assert_true(_registry.validate_enemy_definition(boss, BOSS_ID).is_empty(), "Yan Cheng satisfies the boss enemy contract")

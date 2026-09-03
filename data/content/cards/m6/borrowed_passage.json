@@ -1,0 +1,18 @@
+{
+  "id": "card.public.rogue.borrowed_passage",
+  "name": "借道疾行",
+  "balance_status": "prototype_temporary",
+  "rarity": "advanced",
+  "cost": 0,
+  "tags": ["skill", "merchant"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": true,
+  "conditions": [],
+  "effects": [{"type": "DrawCards", "amount": 2, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "secret_route", "name": "秘径", "overrides": {"effects": [{"type": "DrawCards", "amount": 3, "target": "self"}]}},
+    {"id": "known_roads", "name": "熟路", "overrides": {"cost": 1, "exhaust": false}}
+  ],
+  "presentation": {"description": "借商路快速调度，抽2张牌并消耗。", "icon_id": "m6.rogue.borrowed_passage"}
+}

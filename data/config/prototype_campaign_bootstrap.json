@@ -2,6 +2,7 @@
   "id": "config.prototype.campaign_bootstrap.v1",
   "balance_status": "prototype_temporary",
   "main_city_stage": "ruined_camp",
+  "popular_support": 20,
   "resources": {"silver": 600, "food": 800, "recruits": 1000, "military_knowledge": 250},
   "army_inventory": {"infantry": 1200, "archer": 900, "cavalry": 900},
   "special_resources": {"resource.warhorse": 500, "resource.cavalry_fragment": 0},

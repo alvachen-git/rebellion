@@ -8,7 +8,7 @@ const MotionPolicyScript := preload("res://src/ui/presentation/motion_policy.gd"
 const BRONZE := Tokens.LIGHT_GOLD_DARK
 const PARCHMENT := Tokens.PAPER_BRIGHT
 const MUTED := Tokens.INK_SOFT
-const ROUTE_Y := {
+const LEGACY_ROUTE_Y := {
 	"official_road": 0.2,
 	"village_path": 0.42,
 	"grain_route": 0.64,
@@ -50,22 +50,32 @@ func _rebuild() -> void:
 	if _nodes.is_empty() or size.x <= 0.0:
 		queue_redraw()
 		return
-	var usable_width := maxf(size.x - 190.0, 760.0)
+	var max_layer := 1
+	var layer_counts := {}
+	for source_node in _nodes:
+		var layer := int(source_node.get("layer", source_node.get("column", 0)))
+		max_layer = maxi(max_layer, layer)
+		layer_counts[layer] = int(layer_counts.get(layer, 0)) + 1
+	var usable_width := maxf(size.x - 130.0, 720.0)
 	for node in _nodes:
 		if not node is Dictionary:
 			continue
-		var column := float(node.get("column", 0.0))
+		var column := float(node.get("layer", node.get("column", 0.0)))
 		var route_name := String(node.get("route", "shared"))
-		var y_ratio := float(ROUTE_Y.get(route_name, 0.42))
-		if node.get("id", "") in ["heyuan.start", "heyuan.merge.elite", "heyuan.county_seat"]:
+		var y_ratio := float(LEGACY_ROUTE_Y.get(route_name, 0.42))
+		if node.has("lane"):
+			var lane_count := int(layer_counts.get(int(column), 1))
+			var lane := int(node.get("lane", 0))
+			y_ratio = 0.5 if lane_count <= 1 else float(lane + 1) / float(lane_count + 1)
+		elif node.get("id", "") in ["heyuan.start", "heyuan.merge.elite", "heyuan.county_seat"]:
 			y_ratio = 0.42
-		var center := Vector2(90.0 + usable_width * column / 6.0, 58.0 + (size.y - 130.0) * y_ratio)
+		var center := Vector2(65.0 + usable_width * column / float(max_layer), 42.0 + (size.y - 84.0) * y_ratio)
 		_positions[String(node.get("id", ""))] = center
 		var button := Button.new()
 		button.name = "Node_%s" % String(node.get("id", "")).replace(".", "_").replace("-", "_")
 		button.set_meta("node_id", String(node.get("id", "")))
-		button.position = center - Vector2(76.0, 28.0)
-		button.size = Vector2(152.0, 56.0)
+		button.position = center - Vector2(55.0, 25.0)
+		button.size = Vector2(110.0, 50.0)
 		button.text = _node_label(node)
 		button.tooltip_text = String(node.get("presentation", {}).get("description", ""))
 		button.disabled = not _route.get("available_next_node_ids", []).has(node.get("id", ""))
@@ -99,8 +109,9 @@ func _draw() -> void:
 		if not _positions.has(from_id) or not _positions.has(to_id):
 			continue
 		var visited: bool = _route.get("visited_node_ids", []).has(from_id) and _route.get("visited_node_ids", []).has(to_id)
-		var color := Tokens.with_alpha(BRONZE, 0.94) if visited else Tokens.DISABLED
-		draw_line(_positions[from_id], _positions[to_id], color, 4.0 if visited else 2.5, true)
+		var diagonal := absf(float(_positions[from_id].y) - float(_positions[to_id].y)) > 20.0
+		var color := Tokens.with_alpha(BRONZE, 0.94) if visited else (Tokens.with_alpha(BRONZE, 0.62) if diagonal else Tokens.DISABLED)
+		draw_line(_positions[from_id], _positions[to_id], color, 4.0 if visited else (3.0 if diagonal else 2.5), true)
 
 
 func _node_label(node: Dictionary) -> String:
@@ -113,6 +124,9 @@ func _node_label(node: Dictionary) -> String:
 		"loot": "获",
 		"supply": "补",
 		"intel": "谍",
+		"merchant": "商",
+		"item": "物",
+		"card_reward": "策",
 		"boss": "城",
 		"start": "营",
 		"unknown": "?",

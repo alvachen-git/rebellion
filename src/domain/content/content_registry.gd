@@ -246,6 +246,15 @@ func validate_enemy_definition(data: Dictionary, source: String = "<memory>") ->
 			errors.append("%s: missing enemy field '%s'" % [source, field])
 	if data.has("id") and (not data.id is String or data.id.strip_edges().is_empty()):
 		errors.append("%s: enemy id must be a non-empty string" % source)
+	if not data.has("faction_tags"):
+		errors.append("%s: missing enemy field 'faction_tags'" % source)
+	else:
+		if not data.faction_tags is Array or data.faction_tags.is_empty():
+			errors.append("%s: enemy faction_tags must be a non-empty array" % source)
+		else:
+			for tag in data.faction_tags:
+				if not tag in ["government", "bandit", "merchant"]:
+					errors.append("%s: enemy has unsupported faction tag '%s'" % [source, tag])
 	for attribute in ["troops", "morale", "attack", "defense"]:
 		if data.has(attribute) and (not data[attribute] is float and not data[attribute] is int or data[attribute] < 0):
 			errors.append("%s: enemy %s must be a non-negative number" % [source, attribute])
@@ -317,7 +326,7 @@ func validate_enemy_definition(data: Dictionary, source: String = "<memory>") ->
 				if String(skills[index].get("name", "")).strip_edges().is_empty():
 					errors.append("%s: production skill[%d] requires a name" % [source, index])
 		if data.get("tier", "") == "boss":
-			_validate_boss_modifier_rules(data.get("boss_modifier_rules", null), source, errors)
+			_validate_boss_modifier_rules(data.get("boss_modifier_rules", null), source, errors, bool(data.get("rogue_boss", false)))
 	return errors
 
 
@@ -597,6 +606,24 @@ func _validate_content_references() -> void:
 			var enemy_id: String = node.get("enemy_id", "")
 			if not enemy_id.is_empty() and not _enemies.has(enemy_id):
 				_errors.append("expedition '%s' node '%s' references unknown enemy '%s'" % [expedition_id, node.get("id", ""), enemy_id])
+		var profiles: Array = []
+		var profile = expedition.get("generator_profile", null)
+		if profile is Dictionary:
+			profiles.append(profile)
+		for legacy_profile in expedition.get("legacy_generator_profiles", {}).values():
+			if legacy_profile is Dictionary:
+				profiles.append(legacy_profile)
+		for generator_profile in profiles:
+			profile = generator_profile
+			var referenced_enemy_ids: Array = [profile.get("boss_enemy_id", "")]
+			for pool in profile.get("normal_enemy_pools", {}).values():
+				if pool is Array:
+					referenced_enemy_ids.append_array(pool)
+			referenced_enemy_ids.append_array(profile.get("elite_enemy_pool", []))
+			referenced_enemy_ids.append_array(profile.get("merchant_guard_pool", []))
+			for enemy_id in referenced_enemy_ids:
+				if not _enemies.has(String(enemy_id)):
+					_errors.append("expedition '%s' generator references unknown enemy '%s'" % [expedition_id, enemy_id])
 	for territory_id in _territories:
 		var source_expedition_id: String = _territories[territory_id].get("source_expedition_id", "")
 		if not _expeditions.has(source_expedition_id):
@@ -706,9 +733,11 @@ func _require_effect_fields(
 			errors.append("%s: %s[%d] '%s' missing field '%s'" % [source, kind, index, entry.get("type", ""), field])
 
 
-func _validate_boss_modifier_rules(rules, source: String, errors: PackedStringArray) -> void:
+func _validate_boss_modifier_rules(rules, source: String, errors: PackedStringArray, rogue_boss: bool = false) -> void:
 	if not rules is Dictionary:
 		errors.append("%s: boss requires boss_modifier_rules" % source)
+		return
+	if rogue_boss:
 		return
 	for modifier_id in ["armory_destroyed", "beacon_destroyed", "granary_destroyed"]:
 		if not rules.get(modifier_id, null) is Dictionary:

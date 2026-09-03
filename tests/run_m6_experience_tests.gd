@@ -169,10 +169,13 @@ func _test_legacy_loadout_recovery_experience() -> void:
 func _enter_first_combat(shell) -> void:
 	(shell.find_child("OpenDeploymentButton", true, false) as Button).pressed.emit()
 	await _settle_frames()
+	(shell.find_child("TargetButton_expedition_capture_heyuan_county", true, false) as Button).pressed.emit()
+	await _settle_frames()
 	(shell.find_child("StartExpeditionButton", true, false) as Button).pressed.emit()
 	await _settle_frames()
 	var map = shell.find_child("RouteMap", true, false)
-	(map.button_for_node("heyuan.official.approach") as Button).pressed.emit()
+	var first_id := String(shell.flow_snapshot().expedition.route.available_next_node_ids[0])
+	(map.button_for_node(first_id) as Button).pressed.emit()
 	await _settle_frames()
 	_assert_equal(shell.current_phase(), "combat_checkpoint", "experience fixture reaches a real combat checkpoint")
 

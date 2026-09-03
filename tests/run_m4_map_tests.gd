@@ -31,7 +31,7 @@ func _run_all() -> void:
 
 
 func _test_heyuan_definition_contract() -> void:
-	_assert_equal(_registry.expedition_count(), 1, "registry contains the first Vertical Slice expedition")
+	_assert_equal(_registry.expedition_count(), 3, "registry contains all three Rogue Vertical Slice expeditions")
 	_assert_true(_registry.has_expedition(EXPEDITION_ID), "Heyuan expedition is addressable by stable id")
 	_assert_equal(_definition.nodes.size(), 15, "Heyuan authored skeleton contains fifteen nodes")
 	_assert_true(DefinitionValidatorScript.validate(_definition, "heyuan-test").is_empty(), "Heyuan definition satisfies the expedition contract")

@@ -13,6 +13,12 @@ const AUTOSAVE_EVENTS := {
 	"expedition_node_settled": true,
 	"expedition_terminal_checkpoint": true,
 	"expedition_final_settled": true,
+	"expedition_started": true,
+	"encounter_choice_created": true,
+	"encounter_choice_settled": true,
+	"expedition_item_used": true,
+	"combat_report_created": true,
+	"combat_report_acknowledged": true,
 }
 
 

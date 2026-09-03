@@ -1,0 +1,18 @@
+{
+  "id": "card.public.rogue.seize_grain_rally",
+  "name": "劫粮振军",
+  "balance_status": "prototype_temporary",
+  "rarity": "advanced",
+  "cost": 1,
+  "tags": ["skill", "morale", "bandit"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [{"type": "ModifyMorale", "amount": 12, "target": "self"}, {"type": "DrawCards", "amount": 1, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "full_bellies", "name": "饱食", "overrides": {"effects": [{"type": "ModifyMorale", "amount": 20, "target": "self"}, {"type": "DrawCards", "amount": 1, "target": "self"}]}},
+    {"id": "share_spoils", "name": "分赃", "overrides": {"cost": 0, "exhaust": true}}
+  ],
+  "presentation": {"description": "以缴获鼓舞军心，恢复12士气并抽1张牌。", "icon_id": "m6.rogue.seize_grain_rally"}
+}

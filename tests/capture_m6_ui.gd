@@ -1,7 +1,6 @@
 extends SceneTree
 
 const GameScene := preload("res://src/ui/game/game_shell.tscn")
-const CAPTURE_ROOT := "/tmp/dynasty-rebellion-m6-capture"
 
 
 func _init() -> void:
@@ -11,13 +10,19 @@ func _init() -> void:
 func _capture() -> void:
 	var output_path := "/tmp/dynasty-rebellion-m6-main-city.png"
 	var stage := "main_city"
+	var capture_size := Vector2i(1600, 900)
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--output="):
 			output_path = argument.trim_prefix("--output=")
 		elif argument.begins_with("--stage="):
 			stage = argument.trim_prefix("--stage=")
+		elif argument.begins_with("--width="):
+			capture_size.x = int(argument.trim_prefix("--width="))
+		elif argument.begins_with("--height="):
+			capture_size.y = int(argument.trim_prefix("--height="))
+	root.size = capture_size
 	var shell = GameScene.instantiate()
-	shell.save_root_override = CAPTURE_ROOT
+	shell.save_root_override = "/tmp/dynasty-rebellion-m6-capture"
 	shell.campaign_id_override = "campaign.capture"
 	shell.map_seed_override = 20260902
 	root.add_child(shell)
@@ -26,47 +31,71 @@ func _capture() -> void:
 	shell.start_new_campaign()
 	for frame in 4:
 		await process_frame
-	if stage == "deck_editor":
+	if stage == "target":
+		shell.open_deployment()
+	elif stage == "deck_editor":
 		shell.open_deck_editor()
 	elif stage == "deployment":
 		shell.open_deployment()
-	elif stage in ["map", "battle", "battle_hover_player", "battle_hover_enemy", "success", "retreat", "morale_failure", "death", "game_over"]:
+		for frame in 3:
+			await process_frame
+		(shell.find_child("TargetButton_expedition_capture_heyuan_county", true, false) as Button).pressed.emit()
+	elif stage in ["map", "encounter", "event", "combat_report", "boss_report", "retreat", "morale_failure", "death"]:
 		shell.open_deployment()
-		await process_frame
+		for frame in 3:
+			await process_frame
+		(shell.find_child("TargetButton_expedition_capture_heyuan_county", true, false) as Button).pressed.emit()
+		for frame in 3:
+			await process_frame
 		shell.start_selected_expedition()
-		if stage == "success":
-			await _capture_success_path(shell)
+		if stage == "boss_report":
+			await _advance_to_boss_report(shell)
 		elif stage != "map":
 			for frame in 4:
 				await process_frame
-			shell.select_map_node("heyuan.official.approach")
-			if stage in ["battle_hover_player", "battle_hover_enemy"]:
-				for frame in 6:
+			var expedition_before_battle: Dictionary = shell.flow_snapshot().expedition
+			var event_id := ""
+			var first_id := String(expedition_before_battle.route.available_next_node_ids[0])
+			if stage == "event":
+				for node in expedition_before_battle.visible_nodes:
+					if int(node.layer) == 2 and node.node_type == "event":
+						event_id = String(node.id)
+				for edge in expedition_before_battle.map_edges:
+					if edge.to == event_id and expedition_before_battle.route.available_next_node_ids.has(edge.from):
+						first_id = String(edge.from)
+						break
+			shell.select_map_node(first_id)
+			for frame in 4:
+				await process_frame
+			var expedition: Dictionary = shell.flow_snapshot().expedition
+			if stage in ["encounter", "event", "combat_report"]:
+				var first_request: Dictionary = expedition.pending_combat
+				var first_combat = shell.find_child("IntegratedCombat", true, false)
+				first_combat.battle_finished.emit({"battle_id": first_request.battle_id, "status": "victory", "player_remaining_troops": 1020, "player_remaining_morale": 75, "general_died": false, "general_injured": false})
+				for frame in 5:
 					await process_frame
-				var combatant_name := "PlayerCombatant" if stage == "battle_hover_player" else "EnemyCombatant"
-				var combatant = shell.find_child(combatant_name, true, false)
-				var portrait := combatant.find_child("PortraitButton", true, false) as Button
-				portrait.mouse_entered.emit()
-			elif stage != "battle":
-				for frame in 4:
-					await process_frame
-				var expedition: Dictionary = shell.flow_snapshot().expedition
+				if stage != "combat_report":
+					(shell.find_child("AcknowledgeCombatReportButton", true, false) as Button).pressed.emit()
+					for frame in 4:
+						await process_frame
+					var encounter_id := event_id if stage == "event" else String(shell.flow_snapshot().expedition.route.available_next_node_ids[0])
+					shell.select_map_node(encounter_id)
+			else:
 				var result := {
 					"battle_id": expedition.pending_combat.battle_id,
 					"status": "retreated" if stage == "retreat" else "defeat",
-					"player_remaining_troops": 0 if stage in ["death", "game_over"] else 900,
+					"player_remaining_troops": 900 if stage != "death" else 0,
 					"player_remaining_morale": 60 if stage == "retreat" else (0 if stage == "morale_failure" else 45),
-					"general_died": stage in ["death", "game_over"],
+					"general_died": stage == "death",
 					"general_injured": stage == "morale_failure",
 				}
 				var combat = shell.find_child("IntegratedCombat", true, false)
 				combat.battle_finished.emit(result)
-				if stage == "game_over":
-					for frame in 6:
-						await process_frame
-					await _open_authoritative_game_over(shell)
 	for frame in 24:
 		await process_frame
+	# UI transitions use real elapsed time; wait until every future-node fade-in is complete
+	# so screenshot review measures the settled interface rather than animation timing.
+	await create_timer(0.6).timeout
 	RenderingServer.force_draw(false)
 	await process_frame
 	var image := root.get_texture().get_image()
@@ -78,58 +107,35 @@ func _capture() -> void:
 	quit(0)
 
 
-func _open_authoritative_game_over(shell) -> void:
-	var envelope: Dictionary = shell.flow_snapshot()
-	envelope.erase("phase")
-	envelope.campaign.campaign_status = "game_over"
-	envelope.campaign.game_over_record = {
-		"request_id": "capture.game-over",
-		"general_id": "general.player.placeholder",
-		"expedition_id": "expedition.capture_heyuan_county",
-		"reason": "player_character_death",
-	}
-	var file := FileAccess.open("%s/autosave.json" % CAPTURE_ROOT, FileAccess.WRITE)
-	if file == null:
-		push_error("Unable to write authoritative Game Over capture save")
-		return
-	file.store_string(JSON.stringify(envelope, "  "))
-	file.close()
-	shell.queue_free()
-	await process_frame
-	var resumed = GameScene.instantiate()
-	resumed.save_root_override = CAPTURE_ROOT
-	resumed.campaign_id_override = "campaign.capture"
-	resumed.map_seed_override = 20260902
-	root.add_child(resumed)
-	for frame in 4:
-		await process_frame
-	var continue_button := resumed.find_child("ContinueButton", true, false) as Button
-	if continue_button == null:
-		push_error("Unable to find ContinueButton for authoritative Game Over capture")
-		return
-	continue_button.pressed.emit()
-	for frame in 8:
-		await process_frame
-
-
-func _capture_success_path(shell) -> void:
-	for node_id in ["heyuan.official.approach", "heyuan.official.checkpoint", "heyuan.official.armory", "heyuan.merge.elite", "heyuan.late.intel", "heyuan.county_seat"]:
-		for frame in 3:
+func _advance_to_boss_report(shell) -> void:
+	for step in 48:
+		match shell.current_phase():
+			"expedition_map":
+				var available: Array = shell.flow_snapshot().expedition.route.available_next_node_ids
+				if not available.is_empty():
+					shell.select_map_node(String(available[0]))
+			"combat_checkpoint":
+				var expedition: Dictionary = shell.flow_snapshot().expedition
+				var request: Dictionary = expedition.pending_combat
+				var combat = shell.find_child("IntegratedCombat", true, false)
+				combat.battle_finished.emit({"battle_id": request.battle_id, "status": "victory", "player_remaining_troops": int(expedition.general.troops), "player_remaining_morale": int(expedition.general.morale), "general_died": false, "general_injured": false})
+			"combat_report":
+				if bool(shell.flow_snapshot().expedition.pending_combat_report.get("expedition_terminal", false)):
+					return
+				(shell.find_child("AcknowledgeCombatReportButton", true, false) as Button).pressed.emit()
+			"encounter_choice", "reward_choice":
+				var choice := _first_enabled_choice(shell)
+				if choice != null:
+					choice.pressed.emit()
+		for frame in 4:
 			await process_frame
-		var result: Dictionary = shell.select_map_node(node_id)
-		if not result.ok:
-			push_error("Unable to advance capture route to %s: %s" % [node_id, result.get("error", result.get("reason", "unknown"))])
-			return
-		if shell.current_phase() == "combat_checkpoint":
-			for frame in 3:
-				await process_frame
-			var expedition: Dictionary = shell.flow_snapshot().expedition
-			var combat = shell.find_child("IntegratedCombat", true, false)
-			combat.battle_finished.emit({
-				"battle_id": expedition.pending_combat.battle_id,
-				"status": "victory",
-				"player_remaining_troops": maxi(int(expedition.general.troops) - 24, 1),
-				"player_remaining_morale": maxi(int(expedition.general.morale) - 2, 1),
-				"general_died": false,
-				"general_injured": false,
-			})
+
+
+func _first_enabled_choice(node: Node) -> Button:
+	if node is Button and node.name.begins_with("EncounterChoice_") and not node.disabled:
+		return node
+	for child in node.get_children():
+		var result := _first_enabled_choice(child)
+		if result != null:
+			return result
+	return null

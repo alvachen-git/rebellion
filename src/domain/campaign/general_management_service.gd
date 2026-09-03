@@ -3,6 +3,7 @@ class_name GeneralManagementService
 
 const ATTRIBUTE_IDS := ["martial", "leadership", "administration"]
 const OUTCOME_IDS := ["success", "retreated", "failed"]
+const VICTORY_TYPES := ["normal_combat", "military_objective", "wealth_risk", "merchant_combat", "elite_combat", "boss"]
 const MILESTONE_TYPES := ["talent_branch_choice", "exclusive_card_unlock"]
 
 
@@ -43,7 +44,7 @@ static func validate_progression_definition(definition: Variant, source: String 
 	if not definition is Dictionary:
 		errors.append("%s must be an object" % source)
 		return errors
-	for field in ["id", "balance_status", "max_level", "max_levels_per_expedition", "experience_thresholds", "experience_by_outcome", "major_injury_recovery_cycles", "attribute_growth", "milestone_types"]:
+	for field in ["id", "balance_status", "max_level", "max_levels_per_expedition", "experience_thresholds", "experience_by_outcome", "victory_experience", "major_injury_recovery_cycles", "attribute_growth", "milestone_types"]:
 		if not definition.has(field):
 			errors.append("%s missing field '%s'" % [source, field])
 	if not errors.is_empty():
@@ -65,6 +66,12 @@ static func validate_progression_definition(definition: Variant, source: String 
 		for outcome in OUTCOME_IDS:
 			if not definition.experience_by_outcome.has(outcome) or not _is_non_negative_whole_number(definition.experience_by_outcome.get(outcome)):
 				errors.append("%s experience_by_outcome requires non-negative '%s'" % [source, outcome])
+	if not definition.victory_experience is Dictionary:
+		errors.append("%s victory_experience must be an object" % source)
+	else:
+		for victory_type in VICTORY_TYPES:
+			if not definition.victory_experience.has(victory_type) or not _is_non_negative_whole_number(definition.victory_experience.get(victory_type)):
+				errors.append("%s victory_experience requires non-negative '%s'" % [source, victory_type])
 	_validate_attribute_growth(definition.attribute_growth, int(definition.max_level), source, errors)
 	_validate_milestones(definition.milestone_types, int(definition.max_level), source, errors)
 	return errors
@@ -218,7 +225,7 @@ static func apply_expedition_effect(instance: Dictionary, effect: Dictionary, pr
 		return {"instance": result, "experience_gained": 0, "level_gained": 0, "died": true, "injured": false}
 	if bool(effect.get("general_injured", false)):
 		result.injury = {"status": "major_injury", "remaining_cycles": int(progression.major_injury_recovery_cycles)}
-	var experience_gained := int(progression.experience_by_outcome.get(String(effect.get("outcome", "")), 0))
+	var experience_gained := int(effect.get("experience_gained", progression.experience_by_outcome.get(String(effect.get("outcome", "")), 0)))
 	result.experience = int(result.experience) + experience_gained
 	var level_gained := 0
 	if int(result.level) < int(progression.max_level):
@@ -228,6 +235,24 @@ static func apply_expedition_effect(instance: Dictionary, effect: Dictionary, pr
 			level_gained = 1
 			_apply_level_reward(result, next_level, progression)
 	return {"instance": result, "experience_gained": experience_gained, "level_gained": level_gained, "died": false, "injured": bool(effect.get("general_injured", false))}
+
+
+static func project_experience(level: int, experience: int, gained: int, progression: Dictionary) -> Dictionary:
+	var projected_experience := maxi(0, experience + gained)
+	var projected_level := level
+	if level < int(progression.get("max_level", level)):
+		var next_level := level + 1
+		if projected_experience >= int(progression.get("experience_thresholds", {}).get(str(next_level), 2147483647)):
+			projected_level = next_level
+	var attribute_growth := {}
+	if projected_level > level:
+		attribute_growth = progression.get("attribute_growth", {}).get(str(projected_level), {}).duplicate(true)
+	return {
+		"experience": projected_experience,
+		"level": projected_level,
+		"level_gained": projected_level - level,
+		"attribute_growth": attribute_growth,
+	}
 
 
 static func advance_recovery(instance: Dictionary) -> Dictionary:

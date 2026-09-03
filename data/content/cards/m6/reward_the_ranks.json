@@ -1,0 +1,18 @@
+{
+  "id": "card.public.rogue.reward_the_ranks",
+  "name": "重金犒军",
+  "balance_status": "prototype_temporary",
+  "rarity": "rare",
+  "cost": 1,
+  "tags": ["skill", "morale", "merchant"],
+  "owner_scope": "public",
+  "copy_limit": 1,
+  "exhaust": true,
+  "conditions": [],
+  "effects": [{"type": "ModifyMorale", "amount": 18, "target": "self"}, {"type": "GainArmor", "amount": 25, "target": "self"}],
+  "upgrade_branches": [
+    {"id": "lavish_reward", "name": "厚赏", "overrides": {"effects": [{"type": "ModifyMorale", "amount": 26, "target": "self"}, {"type": "GainArmor", "amount": 40, "target": "self"}]}},
+    {"id": "standing_bounty", "name": "常赏", "overrides": {"exhaust": false, "effects": [{"type": "ModifyMorale", "amount": 12, "target": "self"}, {"type": "GainArmor", "amount": 20, "target": "self"}]}}
+  ],
+  "presentation": {"description": "犒赏全军，恢复18士气并获得25护甲。", "icon_id": "m6.rogue.reward_the_ranks"}
+}

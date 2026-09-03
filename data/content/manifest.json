@@ -1,5 +1,5 @@
 {
-  "content_version": "0.4.0-m4-map",
+  "content_version": "0.7.2-m6-route-variety",
   "cards": [
     "res://data/content/cards/m0_validation_sample.json",
     "res://data/content/cards/dev_basic_attack.json",
@@ -25,7 +25,13 @@
     "res://data/content/cards/m3/prepared_volley.json",
     "res://data/content/cards/m3/lone_breakthrough.json",
     "res://data/content/cards/m3/delayed_strike.json",
-    "res://data/content/cards/m3/formation_breaking_crossbow.json"
+    "res://data/content/cards/m3/formation_breaking_crossbow.json",
+    "res://data/content/cards/m6/shield_cart_advance.json",
+    "res://data/content/cards/m6/crossbow_suppression.json",
+    "res://data/content/cards/m6/roadside_ambush.json",
+    "res://data/content/cards/m6/seize_grain_rally.json",
+    "res://data/content/cards/m6/reward_the_ranks.json",
+    "res://data/content/cards/m6/borrowed_passage.json"
   ],
   "enemies": [
     "res://data/content/enemies/dev_baseline_enemy.json",
@@ -36,7 +42,16 @@
     "res://data/content/enemies/overseer_unit.json",
     "res://data/content/enemies/gao_wu.json",
     "res://data/content/enemies/he_wei.json",
-    "res://data/content/enemies/yan_cheng.json"
+    "res://data/content/enemies/yan_cheng.json",
+    "res://data/content/enemies/bandit_grunt.json",
+    "res://data/content/enemies/bandit_archer.json",
+    "res://data/content/enemies/bandit_raiders.json",
+    "res://data/content/enemies/bandit_black_banner.json",
+    "res://data/content/enemies/shimen_chief.json",
+    "res://data/content/enemies/merchant_guard.json",
+    "res://data/content/enemies/merchant_crossbow.json",
+    "res://data/content/enemies/merchant_escort_captain.json",
+    "res://data/content/enemies/linze_commissioner.json"
   ],
   "talents": [
     "res://data/content/talents/zhao_lie_break_formation.json",
@@ -52,9 +67,13 @@
     "res://data/content/generals/han_yue.json"
   ],
   "expeditions": [
-    "res://data/content/expeditions/capture_heyuan_county.json"
+    "res://data/content/expeditions/capture_heyuan_county.json",
+    "res://data/content/expeditions/secure_shimen_mountain.json",
+    "res://data/content/expeditions/capture_linze_market.json"
   ],
   "territories": [
-    "res://data/content/territories/heyuan_county.json"
+    "res://data/content/territories/heyuan_county.json",
+    "res://data/content/territories/shimen_mountain.json",
+    "res://data/content/territories/linze_market.json"
   ]
 }

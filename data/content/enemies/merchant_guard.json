@@ -1,0 +1,55 @@
+{
+  "id": "enemy.merchant.guard",
+  "name": "商队护卫",
+  "balance_status": "prototype_temporary",
+  "tier": "normal",
+  "faction_tags": [
+    "merchant"
+  ],
+  "troops": 700,
+  "max_troops": 700,
+  "morale": 78,
+  "max_morale": 100,
+  "attack": 24,
+  "defense": 24,
+  "army_composition": {
+    "infantry": 0.65,
+    "archer": 0.25,
+    "cavalry": 0.1
+  },
+  "skills": [
+    {
+      "id": "enemy.merchant.guard.escort",
+      "name": "护货迎击",
+      "intent_type": "attack",
+      "weight": 4,
+      "cooldown": 0,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "DealDamage",
+          "base_power": 62,
+          "target": "opponent"
+        }
+      ]
+    },
+    {
+      "id": "enemy.merchant.guard.circle",
+      "name": "结车为阵",
+      "intent_type": "defend",
+      "weight": 3,
+      "cooldown": 1,
+      "conditions": [],
+      "effects": [
+        {
+          "type": "GainArmor",
+          "amount": 65,
+          "target": "self"
+        }
+      ]
+    }
+  ],
+  "presentation": {
+    "description": "受雇保护商货的护卫，阵形稳健。"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "card.public.rogue.roadside_ambush",
+  "name": "伏路奇袭",
+  "balance_status": "prototype_temporary",
+  "rarity": "advanced",
+  "cost": 1,
+  "tags": ["attack", "morale", "bandit"],
+  "owner_scope": "public",
+  "copy_limit": 2,
+  "exhaust": false,
+  "conditions": [],
+  "effects": [{"type": "DealDamage", "base_power": 55, "target": "opponent"}, {"type": "ModifyMorale", "amount": -5, "target": "opponent"}],
+  "upgrade_branches": [
+    {"id": "deep_ambush", "name": "深伏", "overrides": {"effects": [{"type": "DealDamage", "base_power": 75, "target": "opponent"}, {"type": "ModifyMorale", "amount": -7, "target": "opponent"}]}},
+    {"id": "scatter", "name": "惊散", "overrides": {"cost": 0, "exhaust": true, "effects": [{"type": "DealDamage", "base_power": 40, "target": "opponent"}, {"type": "ModifyMorale", "amount": -7, "target": "opponent"}]}}
+  ],
+  "presentation": {"description": "突袭阻路敌军，造成伤害并动摇其士气。", "icon_id": "m6.rogue.roadside_ambush"}
+}

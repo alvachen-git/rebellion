@@ -2,6 +2,7 @@
   "id": "enemy.elite.gao_wu",
   "name": "高武",
   "tier": "elite",
+  "faction_tags": ["government"],
   "talent_id": "talent.gao_wu.discipline",
   "troops": 1080,
   "max_troops": 1080,

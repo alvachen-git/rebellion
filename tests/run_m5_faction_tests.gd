@@ -26,6 +26,9 @@ func _run_all() -> void:
 	_registry = ContentRegistryScript.new()
 	_assert_true(_registry.load_all(), "M5 faction content registry loads")
 	_cycle_config = _load_json(CYCLE_CONFIG_PATH)
+	# Keep this historical M5 suite scoped to the original Heyuan slice. M6
+	# validates the expanded three-target catalog independently.
+	_cycle_config.cycle_advancing_expedition_ids = ["expedition.capture_heyuan_county"]
 	_heyuan = _registry.get_territory(HEYUAN_ID)
 	_test_territory_and_cycle_contracts()
 	_test_campaign_state_and_old_save_defaults()
@@ -40,7 +43,7 @@ func _run_all() -> void:
 
 
 func _test_territory_and_cycle_contracts() -> void:
-	_assert_equal(_registry.territory_count(), 1, "Vertical Slice registers exactly one territory")
+	_assert_equal(_registry.territory_count(), 3, "Rogue Vertical Slice registers three territories")
 	_assert_true(_registry.has_territory(HEYUAN_ID), "Heyuan County is addressable by stable territory id")
 	_assert_true(not _heyuan.is_empty(), "Heyuan territory definition loads")
 	_assert_true(FactionCycleServiceScript.validate_territory_definition(_heyuan).is_empty(), "Heyuan territory definition satisfies its contract")

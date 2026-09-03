@@ -1,6 +1,70 @@
 {
   "id": "expedition.capture_heyuan_county",
   "name": "攻取河源县",
+  "destination_name": "河源县",
+  "theme": "官兵军镇",
+  "reward_summary": "军学、粮食",
+  "territory_id": "territory.heyuan_county",
+  "capture_rebellion": 30,
+  "legacy_generator_profiles": {
+    "2": {
+      "version": 2, "layer_count": 9, "nodes_per_middle_layer_min": 2, "nodes_per_middle_layer_max": 3,
+      "node_prefix": "heyuan.rogue", "boss_enemy_id": "enemy.boss.yan_cheng",
+      "normal_enemy_pools": {"government": ["enemy.normal.city_defenders", "enemy.normal.crossbow_company", "enemy.normal.patrol_inspector"], "bandit": ["enemy.bandit.grunt", "enemy.bandit.archer", "enemy.bandit.raiders"]},
+      "normal_faction_weights": {"government": 70, "bandit": 30}, "merchant_weight": 20,
+      "elite_enemy_pool": ["enemy.elite.gao_wu", "enemy.elite.he_wei", "enemy.bandit.black_banner"],
+      "merchant_guard_pool": ["enemy.merchant.guard", "enemy.merchant.crossbow"],
+      "event_pool": ["event.heyuan.armory", "event.heyuan.beacon", "event.heyuan.granary", "event.heyuan.requisition"],
+      "boss_reward": {"resource.silver": 100, "resource.food": 120, "resource.recruits": 60, "resource.military_knowledge": 80, "resource.cavalry_fragment": 1}
+    },
+    "3": {
+      "version": 3, "layer_count": 9, "nodes_per_middle_layer_min": 3, "nodes_per_middle_layer_max": 3,
+      "node_prefix": "heyuan.rogue", "boss_enemy_id": "enemy.boss.yan_cheng",
+      "normal_enemy_pools": {"government": ["enemy.normal.city_defenders", "enemy.normal.crossbow_company", "enemy.normal.patrol_inspector"], "bandit": ["enemy.bandit.grunt", "enemy.bandit.archer", "enemy.bandit.raiders"]},
+      "normal_faction_weights": {"government": 70, "bandit": 30}, "merchant_weight": 20,
+      "elite_enemy_pool": ["enemy.elite.gao_wu", "enemy.elite.he_wei", "enemy.bandit.black_banner"],
+      "merchant_guard_pool": ["enemy.merchant.guard", "enemy.merchant.crossbow"],
+      "event_pool": [
+        "event.common.hungry_civilians", "event.common.venomous_snakes", "event.common.flash_flood", "event.common.lost_child",
+        "event.common.deserters", "event.common.injured_trader", "event.common.ruined_temple", "event.common.landslide",
+        "event.common.tainted_water", "event.common.battlefield_dead", "event.common.local_gentry", "event.common.rumors",
+        "event.heyuan.armory", "event.heyuan.beacon", "event.heyuan.granary", "event.heyuan.requisition",
+        "event.heyuan.refugee_camp", "event.heyuan.constable_hunt", "event.heyuan.collapsed_canal", "event.heyuan.elder_petition"
+      ],
+      "boss_reward": {"resource.silver": 100, "resource.food": 120, "resource.recruits": 60, "resource.military_knowledge": 80, "resource.cavalry_fragment": 1}
+    }
+  },
+  "generator_profile": {
+    "version": 4,
+    "layer_count": 9,
+    "nodes_per_middle_layer_min": 1,
+    "nodes_per_middle_layer_max": 4,
+    "node_prefix": "heyuan.rogue",
+    "boss_enemy_id": "enemy.boss.yan_cheng",
+    "normal_enemy_pools": {
+      "government": ["enemy.normal.city_defenders", "enemy.normal.crossbow_company", "enemy.normal.patrol_inspector"],
+      "bandit": ["enemy.bandit.grunt", "enemy.bandit.archer", "enemy.bandit.raiders"]
+    },
+    "normal_faction_weights": {"government": 70, "bandit": 30},
+    "merchant_weight": 20,
+    "elite_enemy_pool": ["enemy.elite.gao_wu", "enemy.elite.he_wei", "enemy.bandit.black_banner"],
+    "merchant_guard_pool": ["enemy.merchant.guard", "enemy.merchant.crossbow"],
+    "topology_templates": [
+      {"id": "gate_then_fan", "weight": 4, "layer_node_counts": [3, 2, 3, 3, 1, 3, 2]},
+      {"id": "double_diamond", "weight": 3, "layer_node_counts": [3, 2, 4, 3, 4, 3, 3]},
+      {"id": "wide_detour", "weight": 1, "layer_node_counts": [3, 4, 2, 3, 2, 4, 2]},
+      {"id": "narrow_pass", "weight": 3, "layer_node_counts": [3, 3, 1, 3, 2, 3, 2]},
+      {"id": "braided_valley", "weight": 2, "layer_node_counts": [3, 2, 4, 3, 2, 3, 2]}
+    ],
+    "event_pool": [
+      "event.common.hungry_civilians", "event.common.venomous_snakes", "event.common.flash_flood", "event.common.lost_child",
+      "event.common.deserters", "event.common.injured_trader", "event.common.ruined_temple", "event.common.landslide",
+      "event.common.tainted_water", "event.common.battlefield_dead", "event.common.local_gentry", "event.common.rumors",
+      "event.heyuan.armory", "event.heyuan.beacon", "event.heyuan.granary", "event.heyuan.requisition",
+      "event.heyuan.refugee_camp", "event.heyuan.constable_hunt", "event.heyuan.collapsed_canal", "event.heyuan.elder_petition"
+    ],
+    "boss_reward": {"resource.silver": 100, "resource.food": 120, "resource.recruits": 60, "resource.military_knowledge": 80, "resource.cavalry_fragment": 1}
+  },
   "node_count_min": 12,
   "node_count_max": 16,
   "entry_node_id": "heyuan.start",

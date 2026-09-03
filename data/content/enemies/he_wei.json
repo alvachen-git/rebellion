@@ -2,6 +2,7 @@
   "id": "enemy.elite.he_wei",
   "name": "贺巍",
   "tier": "elite",
+  "faction_tags": ["government"],
   "talent_id": "talent.he_wei.black_armor",
   "troops": 1150,
   "max_troops": 1150,

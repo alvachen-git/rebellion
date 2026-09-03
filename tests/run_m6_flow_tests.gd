@@ -65,15 +65,15 @@ func _run_all() -> void:
 
 func _test_save_v3_structural_migration() -> void:
 	var current := SaveEnvelopeScript.create_empty("campaign.v4", "2026-09-02T01:00:00Z")
-	_assert_equal(current.save_version, 4, "new envelope uses Save V4")
-	_assert_equal(current.content_version, "0.6.1-m6-deck-editor", "new envelope uses the deck-editor content version")
+	_assert_equal(current.save_version, 7, "new envelope uses Save V7")
+	_assert_equal(current.content_version, "0.7.3-m6-battle-report", "new envelope uses the battle-report content version")
 	var legacy := current.duplicate(true)
 	legacy.save_version = 2
 	legacy.content_version = "0.4.0-m4-map"
 	legacy.campaign.erase("base_loadout")
 	legacy.campaign.erase("loadout_system")
 	var decoded := SaveGameCodecScript.new().decode(JSON.stringify(legacy))
-	_assert_true(decoded.ok and decoded.migrated and decoded.to_version == 4, "Save V2 migrates through Save V4")
+	_assert_true(decoded.ok and decoded.migrated and decoded.to_version == 7, "Save V2 migrates through Save V7")
 	_assert_equal(decoded.value.content_version, "0.4.0-m4-map", "V2 migration preserves old content version")
 	_assert_true(decoded.value.campaign.base_loadout.is_empty(), "V2 migration does not silently choose a shared base loadout")
 	_assert_true(decoded.value.campaign.loadout_system.requires_legacy_recovery, "V2 migration requires explicit shared-loadout recovery")
@@ -235,7 +235,7 @@ func _test_complete_flow_and_recovery() -> void:
 	_assert_true(flow.save_manual(2, "2026-09-02T02:25:00Z").ok, "post-return changes save explicitly")
 	var final_reload = _new_flow(ToggleSaveStore.new())
 	_assert_true(final_reload.load_campaign("%s/manual_2.json" % SAVE_ROOT).ok, "post-return manual save reloads")
-	var second_ready: Dictionary = final_reload.expedition_readiness({"expedition_id": "expedition.capture_heyuan_county", "general_id": "general.zhao_lie"})
+	var second_ready: Dictionary = final_reload.expedition_readiness({"expedition_id": "expedition.secure_shimen_mountain", "general_id": "general.zhao_lie"})
 	_assert_true(second_ready.ok, "post-return state is legal for a second expedition without starting it: %s" % str(second_ready.get("errors", [])))
 	if second_ready.ok:
 		_assert_equal(second_ready.troop_cap, 1075, "level-two leadership raises Zhao Lie's troop cap by 25")
@@ -292,6 +292,10 @@ func _submit_victory(flow, troops: int, morale: int, label: String) -> void:
 	_assert_true(applied.ok, label)
 	var duplicate: Dictionary = flow.submit_combat_result(result, "2026-09-02T02:11:01Z")
 	_assert_true(duplicate.ok and duplicate.duplicate, "%s is idempotent on replay" % label)
+	var report: Dictionary = flow.pending_combat_report()
+	_assert_true(not report.is_empty() and flow.phase() == "combat_report", "%s creates a persisted combat report" % label)
+	var acknowledged: Dictionary = flow.acknowledge_combat_report({"action_id": "ack:%s" % report.report_id, "report_id": report.report_id}, "2026-09-02T02:11:02Z")
+	_assert_true(acknowledged.ok, "%s report can be acknowledged" % label)
 
 
 func _test_autosave_failure_rolls_back() -> void:

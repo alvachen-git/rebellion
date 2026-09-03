@@ -2,6 +2,7 @@
   "id": "enemy.normal.city_defenders",
   "name": "城防兵",
   "tier": "normal",
+  "faction_tags": ["government"],
   "troops": 760,
   "max_troops": 760,
   "morale": 72,
