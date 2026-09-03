@@ -19,6 +19,7 @@ static func create() -> Theme:
 	_configure_inputs(result)
 	_configure_scrollbars(result)
 	_configure_separators(result)
+	_configure_tooltips(result)
 	return result
 
 
@@ -134,3 +135,11 @@ static func _configure_separators(theme: Theme) -> void:
 	vertical.thickness = 1
 	vertical.vertical = true
 	theme.set_stylebox("separator", "VSeparator", vertical)
+
+
+static func _configure_tooltips(theme: Theme) -> void:
+	theme.set_stylebox("panel", "TooltipPanel", Tokens.panel_style(
+		Tokens.with_alpha(Tokens.DEEP_TEAL_DARK, 0.97), Tokens.with_alpha(Tokens.LIGHT_GOLD, 0.82), Tokens.RADIUS_SM, 1, Tokens.SPACE_SM
+	))
+	theme.set_color("font_color", "TooltipLabel", Tokens.PAPER_BRIGHT)
+	theme.set_font_size("font_size", "TooltipLabel", Tokens.FONT_BODY)

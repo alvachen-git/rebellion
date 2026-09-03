@@ -54,7 +54,7 @@ var _card_buttons: Array[Button] = []
 @onready var selection_hint: Label = %SelectionHint
 @onready var start_selected_button: Button = %StartSelectedButton
 @onready var impact_label: Label = %ImpactLabel
-@onready var hand_container: HBoxContainer = %HandContainer
+@onready var hand_container: Container = %HandContainer
 @onready var end_turn_button: Button = %EndTurnButton
 @onready var retreat_button: Button = %RetreatButton
 @onready var retreat_dialog: ConfirmationDialog = %RetreatDialog
@@ -93,6 +93,20 @@ func _apply_combat_style() -> void:
 	intent_label.theme_type_variation = "QingluHeading"
 	action_label.theme_type_variation = "QingluHeading"
 	feedback_label.theme_type_variation = "QingluMuted"
+	var action_badge: PanelContainer = $Page/Command/Stack/StatusRow/ActionBadge
+	var feedback_badge: PanelContainer = $Page/Command/Stack/StatusRow/FeedbackBadge
+	action_badge.add_theme_stylebox_override("panel", Tokens.panel_style(
+		Tokens.with_alpha(Tokens.DEEP_TEAL_DARK, 0.90), Tokens.with_alpha(Tokens.LIGHT_GOLD, 0.82), Tokens.RADIUS_SM, 1, Tokens.SPACE_SM
+	))
+	feedback_badge.add_theme_stylebox_override("panel", Tokens.panel_style(
+		Color.TRANSPARENT, Color.TRANSPARENT, 0, 0, 0
+	))
+	action_label.add_theme_color_override("font_color", Tokens.PAPER_BRIGHT)
+	action_label.add_theme_color_override("font_outline_color", Tokens.with_alpha(Tokens.DEEP_TEAL_DARK, 0.98))
+	action_label.add_theme_constant_override("outline_size", 3)
+	feedback_label.add_theme_color_override("font_color", Tokens.DEEP_TEAL_DARK)
+	feedback_label.add_theme_color_override("font_outline_color", Tokens.with_alpha(Tokens.PAPER_BRIGHT, 0.82))
+	feedback_label.add_theme_constant_override("outline_size", 2)
 	start_selected_button.theme_type_variation = "QingluPrimaryButton"
 	end_turn_button.theme_type_variation = "QingluPrimaryButton"
 	restart_button.theme_type_variation = "QingluPrimaryButton"
@@ -112,7 +126,7 @@ func setup_battle(request: Dictionary = {}) -> bool:
 		_show_boot_error("战斗初始化失败：%s" % "；".join(errors))
 		return false
 	result_overlay.visible = false
-	feedback_label.text = "观察敌方意图，安排本回合出牌顺序。"
+	feedback_label.text = ""
 	_refresh()
 	return true
 
@@ -246,11 +260,9 @@ func _rebuild_hand(state: Dictionary) -> void:
 			button.modulate.a = 1.0
 			continue
 		button.modulate.a = 0.0
-		button.position.y += 18.0
 		var tween := create_tween().set_parallel(true)
 		var delay: float = hand_index * 0.035
 		tween.tween_property(button, "modulate:a", 1.0, 0.16).set_delay(delay)
-		tween.tween_property(button, "position:y", button.position.y - 18.0, 0.16).set_delay(delay).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
 func _on_card_hover(button: Button, hand_index: int) -> void:
@@ -259,20 +271,22 @@ func _on_card_hover(button: Button, hand_index: int) -> void:
 	button.z_index = 5
 	if MotionPolicyScript.reduced():
 		return
+	var base_y := float(button.get_meta("fan_base_y", button.position.y))
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(button, "scale", Vector2(1.04, 1.04), 0.1)
-	tween.tween_property(button, "position:y", button.position.y - 10.0, 0.1)
+	tween.tween_property(button, "position:y", base_y - 14.0, 0.1)
 
 
 func _on_card_unhover(button: Button) -> void:
 	button.z_index = 0
+	var base_y := float(button.get_meta("fan_base_y", 0.0))
 	if MotionPolicyScript.reduced():
 		button.scale = Vector2.ONE
-		button.position.y = 0.0
+		button.position.y = base_y
 		return
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(button, "scale", Vector2.ONE, 0.1)
-	tween.tween_property(button, "position:y", 0.0, 0.1)
+	tween.tween_property(button, "position:y", base_y, 0.1)
 
 
 func _show_result(result: Dictionary) -> void:

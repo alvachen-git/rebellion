@@ -46,12 +46,14 @@
     "combatant.government.heavy": {"kind": "combatant_standee", "path": "res://assets/art/combatants/government_heavy_template_v0.1.png", "crop_anchor": [0.5, 1.0], "flip_h": true, "status": "representative_review"},
 
     "screen.main_city.stage1": {"kind": "background", "path": "res://assets/art/scenes/rebel_camp_stage1.png", "crop_anchor": [0.5, 0.5], "status": "representative_review"},
-    "screen.combat.heyuan": {"kind": "background", "path": "res://assets/art/scenes/heyuan_battlefield.png", "crop_anchor": [0.5, 0.5], "status": "representative_review"},
+    "screen.combat.heyuan": {"kind": "background", "path": "res://assets/art/scenes/chenwu_songgu_battlefield_v2.png", "crop_anchor": [0.5, 0.5], "status": "representative_review"},
     "screen.deck_editor": {"kind": "background", "path": "res://assets/art/scenes/rebel_camp_stage1.png", "crop_anchor": [0.5, 0.5], "status": "shared"},
     "screen.deployment": {"kind": "background", "path": "res://assets/art/scenes/rebel_camp_stage1.png", "crop_anchor": [0.5, 0.5], "status": "shared"},
     "screen.expedition_map": {"kind": "background", "path": "res://assets/art/scenes/rebel_camp_stage1.png", "crop_anchor": [0.5, 0.5], "status": "shared"},
     "screen.settlement": {"kind": "background", "path": "res://assets/art/scenes/rebel_camp_stage1.png", "crop_anchor": [0.5, 0.5], "status": "shared"},
     "screen.failure": {"kind": "background", "path": "res://assets/art/scenes/heyuan_battlefield.png", "crop_anchor": [0.5, 0.5], "status": "shared"},
+
+    "ui.combat.status_brush_mask": {"kind": "ui_texture", "path": "res://assets/art/ui/status_brush_mask.png", "status": "representative_review"},
 
     "icon.resource.grain": {"kind": "code_icon", "path": "res://src/ui/components/art_icon.gd"},
     "icon.resource.wood": {"kind": "code_icon", "path": "res://src/ui/components/art_icon.gd"},

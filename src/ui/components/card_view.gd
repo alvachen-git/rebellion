@@ -211,7 +211,9 @@ func _apply_state_style() -> void:
 	add_theme_stylebox_override("disabled", disabled_style)
 	disabled = not available
 	tooltip_text = _tooltip()
-	modulate = Color(1, 1, 1, 0.78) if not available else Color.WHITE
+	# Disabled cards stay unmistakably muted, but remain readable over the new
+	# continuous illustrated battlefield rather than disappearing into it.
+	modulate = Color(1, 1, 1, 0.9) if not available else Color.WHITE
 
 
 func _description() -> String:

@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource path="res://src/ui/combat/combat_screen.gd" type="Script" id="1_screen"]
 [ext_resource path="res://src/ui/combat/battlefield_backdrop.gd" type="Script" id="2_backdrop"]
 [ext_resource path="res://src/ui/components/combatant_stage_view.gd" type="Script" id="3_combatant"]
+[ext_resource path="res://src/ui/components/fan_hand_container.gd" type="Script" id="4_fan_hand"]
 
 [node name="CombatScreen" type="Control"]
 layout_mode = 3
@@ -20,6 +21,17 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="BattleBackdrop" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_backdrop")
 
 [node name="Page" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -112,16 +124,6 @@ custom_minimum_size = Vector2(0, 372)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Backdrop" type="Control" parent="Page/Battlefield"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("2_backdrop")
-
 [node name="IntentPanel" type="PanelContainer" parent="Page/Battlefield"]
 layout_mode = 1
 anchors_preset = 10
@@ -148,9 +150,9 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -340.0
-offset_top = 64.0
+offset_top = 144.0
 offset_right = -70.0
-offset_bottom = 360.0
+offset_bottom = 410.0
 grow_horizontal = 0
 script = ExtResource("3_combatant")
 
@@ -158,9 +160,9 @@ script = ExtResource("3_combatant")
 unique_name_in_owner = true
 layout_mode = 1
 offset_left = 70.0
-offset_top = 64.0
+offset_top = 144.0
 offset_right = 340.0
-offset_bottom = 360.0
+offset_bottom = 410.0
 script = ExtResource("3_combatant")
 
 [node name="ImpactLabel" type="Label" parent="Page/Battlefield"]
@@ -186,9 +188,9 @@ vertical_alignment = 1
 custom_minimum_size = Vector2(0, 284)
 layout_mode = 2
 theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 10
+theme_override_constants/margin_top = 4
 theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 18
+theme_override_constants/margin_bottom = 12
 
 [node name="Stack" type="VBoxContainer" parent="Page/Command"]
 layout_mode = 2
@@ -197,21 +199,38 @@ theme_override_constants/separation = 8
 [node name="StatusRow" type="HBoxContainer" parent="Page/Command/Stack"]
 layout_mode = 2
 theme_override_constants/separation = 14
+alignment = 1
 
-[node name="ActionLabel" type="Label" parent="Page/Command/Stack/StatusRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 0)
+[node name="ActionBadge" type="PanelContainer" parent="Page/Command/Stack/StatusRow"]
+custom_minimum_size = Vector2(166, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "3 / 3 行动力"
 
-[node name="FeedbackLabel" type="Label" parent="Page/Command/Stack/StatusRow"]
+[node name="ActionLabel" type="Label" parent="Page/Command/Stack/StatusRow/ActionBadge"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.956863, 0.92549, 0.815686, 1)
+theme_override_colors/font_outline_color = Color(0.0352941, 0.137255, 0.145098, 0.92)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 18
+text = "3 / 3 行动力"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="FeedbackBadge" type="PanelContainer" parent="Page/Command/Stack/StatusRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="FeedbackLabel" type="Label" parent="Page/Command/Stack/StatusRow/FeedbackBadge"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.956863, 0.92549, 0.815686, 1)
+theme_override_colors/font_outline_color = Color(0.0352941, 0.137255, 0.145098, 0.9)
+theme_override_constants/outline_size = 3
 theme_override_font_sizes/font_size = 15
-text = "观察敌方意图，安排本回合出牌顺序。"
+text = ""
 text_overrun_behavior = 3
+vertical_alignment = 1
 
 [node name="RetreatButton" type="Button" parent="Page/Command/Stack/StatusRow"]
 unique_name_in_owner = true
@@ -237,10 +256,10 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="HandContainer" type="HBoxContainer" parent="Page/Command/Stack/HandScroll/HandCenter"]
+[node name="HandContainer" type="Container" parent="Page/Command/Stack/HandScroll/HandCenter"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 12
+script = ExtResource("4_fan_hand")
 
 [node name="RetreatDialog" type="ConfirmationDialog" parent="."]
 unique_name_in_owner = true
